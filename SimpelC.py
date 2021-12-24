@@ -1039,7 +1039,7 @@ class Byte:
 class ParseResult:
     def __init__(self):
         self.error = None
-        self.scriptNode = None
+        self.node = None
         self.lastAdvCount = 0
         self.advanceCount = 0
         self.reverseCount = 0
@@ -1078,11 +1078,12 @@ class ParseResult:
 masterscript = MasterScript([])
 metacode = []
 
-class ParseMath:
+
+class Parser:
     def __init__(self, scriptName, tokens):
         self.tokens = tokens
         self.scriptName = scriptName
-        self.tok_idx = -1
+        self.idx = -1
         self.advance()
 
     def reverse(self, amount=1):
@@ -1106,7 +1107,7 @@ class ParseMath:
                 Error(
                     "Expected valid expression...", PARSEERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
-        
+
         masterscript.libs.append(res.node)
         return res
 
@@ -1127,7 +1128,7 @@ class ParseMath:
         global_variables = []
         global_classes = []
         global_structs = []
-        
+
         moreStatements = True
         while moreStatements:
             if self.currTok.type == METAKEYWORD:
@@ -1245,8 +1246,9 @@ class ParseMath:
         self.advance()
 
         metacode.append(node)
+        return res.success(node)
         # return res.success(node)
-    
+
     def namespace(self):
         res = ParseResult()
         classes = []
@@ -1282,7 +1284,7 @@ class ParseMath:
                 break
             if res.error:
                 return res
-            
+
             if isinstance(expr, Variable):
                 return res.failure(
                     Error(
@@ -1294,7 +1296,7 @@ class ParseMath:
             elif isinstance(expr, Struct):
                 expr.namespace = name
                 structs.append(expr)
-            
+
         res.registerAdvance()
         self.advance()
 
@@ -1303,9 +1305,9 @@ class ParseMath:
                 Error(
                     "Expected '}'.", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
-            
+
         return res.success(Namespace(name, classes, structs))
-    
+
     def ClassOrVarOrFunc(self):
         res = ParseResult()
 
@@ -1354,7 +1356,7 @@ class ParseMath:
             node = res.register(self.defVar())
             if res.error:
                 return res
-            
+
             node.public = public
             node.static = static
             node.const = const
@@ -1362,9 +1364,12 @@ class ParseMath:
         elif self.currTok.type == IDENTIFIER:
             pass  # Constructor or VarAccess or FuncCall
 
-        res.registerAdvance()
-        self.advance()
-    
+        return res.failure(
+                Error(
+                    "Expected valid class, variable or function...", PARSEERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+        
+
     def _class(self):
         res = ParseResult()
 
@@ -1452,7 +1457,7 @@ class ParseMath:
 
     def Constructor(self):
         pass
-    
+
     def function(self):
         res = ParseResult()
 
@@ -1558,7 +1563,7 @@ class ParseMath:
                     self.currTok.start, self.currTok.end, self.scriptName))
 
         return res.success(Function(None, variables, False, False, False, False, returnType, name, args, body))
-    
+
     def statement(self):
         res = ParseResult()
 
@@ -1576,7 +1581,7 @@ class ParseMath:
             returnTok = res.register(self.expr())
             if res.error:
                 return res
-            
+
             res.registerAdvance()
             self.advance()
             if not self.currTok.type == ENDCOLUMN:
@@ -1615,39 +1620,39 @@ class ParseMath:
             if res.error:
                 return res
             statement = node
-            
+
         return res.success(statement)
-    
+
     def defVar(self):
         res = ParseResult()
-        
+
         type = self.currTok.value
         res.registerAdvance()
         self.advance()
-        
+
         if not self.currTok.type == IDENTIFIER:
             return res.failure(
                 Error(
                     "Expected identifier.", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
-        
+
         name = self.currTok.value
         res.registerAdvance()
         self.advance()
-        
+
         if not self.currTok.type == EQUALS:
             return res.failure(
                 Error(
                     "Expected '='.", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
-        
+
         value = res.register(self.expr())
         if res.error:
             return res
-        
+
         res.registerAdvance()
         self.advance()
-        
+
         if not self.currTok.type == ENDCOLUMN:
             return res.failure(
                 Error(
@@ -1655,7 +1660,7 @@ class ParseMath:
                     self.currTok.start, self.currTok.end, self.scriptName))
 
         return res.success(Variable(None, None, None, False, False, False, type, name, value))
-    
+
     def atom(self):
         res = ParseResult()
         tok = self.currTok
@@ -1672,7 +1677,8 @@ class ParseMath:
             res.registerAdvance()
             self.advance()
             expr = res.register(self.expr())
-            if res.error: return res
+            if res.error:
+                return res
             if self.currTok.type == RBRACKET:
                 res.registerAdvance()
                 self.advance()
@@ -1686,9 +1692,9 @@ class ParseMath:
             node = res.register(self.expr())
             if res.error:
                 return res
-            
+
             return res.success(node)
-        
+
         return res.failure(
             Error(
                 "Expected number, identifier, '+', '-' or '('", SyntaxError,
@@ -1705,7 +1711,8 @@ class ParseMath:
             res.registerAdvance()
             self.advance()
             factor = res.register(self.factor())
-            if res.error: return res
+            if res.error:
+                return res
             return res.success(UnaryNode(tok, factor))
 
         return self.power()
@@ -1720,7 +1727,7 @@ class ParseMath:
             node = res.register(self.ClassOrVarOrFunc())
             if res.error:
                 return res
-            
+
             return res.success(node)
         elif self.currTok.value == NAMESPACE:
             node = res.register(self.namespace())
@@ -1732,7 +1739,7 @@ class ParseMath:
             node = res.register(self.ClassOrVarOrFunc())
             if res.error:
                 return res
-            
+
             return res.success(node)
         elif self.currTok.value == STRUCT:
             pass
@@ -1740,7 +1747,7 @@ class ParseMath:
             metaNode = res.register(self.metacode())
             if res.error:
                 return res
-            
+
             return res.success(metaNode)
 
         node = res.register(self.bin_op(self.term, (PLUS, MINUS)))
@@ -1756,17 +1763,19 @@ class ParseMath:
     def bin_op(self, func_a, ops, func_b=None):
         if func_b == None:
             func_b = func_a
-        
+
         res = ParseResult()
         left = res.register(func_a())
-        if res.error: return res
+        if res.error:
+            return res
 
         while self.currTok.type in ops:
             op_tok = self.currTok
             res.registerAdvance()
             self.advance()
             right = res.register(func_b())
-            if res.error: return res
+            if res.error:
+                return res
             left = BinOpNode(left, op_tok, right)
 
         return res.success(left)
@@ -1782,8 +1791,8 @@ def run(fn, text):
     tokens, error = lexer.genTokens()
     if error:
         return None, error
-    
-    parser = ParseMath(fn, tokens)
+
+    parser = Parser(fn, tokens)
     ast = parser.parse()
-    
+
     return ast.node, ast.error
