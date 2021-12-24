@@ -215,6 +215,9 @@ class Position:
 
     def copy(self):
         return Position(self.idx, self.ln, self.col, self.fn, self.ftxt)
+    
+    def __repr__(self):
+        return f'{self.ln}'
 
 
 class Token:
@@ -1158,7 +1161,12 @@ class Parser:
                         global_structs.append(node)
             elif self.currTok.type == EOF:
                 break
-
+            else:
+                return res.failure(
+                    Error(
+                        "No valid expression found.", PARSEERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName)) 
+            
         # Final touch to metacode
         for node in metacode:
             if node.type == DEFINE:
@@ -1352,7 +1360,7 @@ class Parser:
                 node.static = static
                 node.const = const
                 return res.success(node)
-        elif self.currTok.type in VARTYPES:
+        elif self.currTok.type in VARTYPE:
             node = res.register(self.defVar())
             if res.error:
                 return res
