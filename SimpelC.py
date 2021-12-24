@@ -690,6 +690,18 @@ class Variable:
         return f'Variable Node : [ {self.lib} | {self.namespace} | {self.classNode} | {self.public} | {condition} | {self.type} | {self.name} | {self.value} ]'
 
 
+class VarAccess:
+    def __init__(self, classNode, varName, start, end):
+        self.classNode = classNode
+        self.varName = varName
+
+        self.start = start
+        self.end = end
+
+    def __repr__(self):
+        return f'VarAccess Node : [ {self.classNode} | {self.varName} ]'
+
+
 class List:
     def __init__(self, classNode, public, static, const, type, name, elements, start, end):
         self.classNode = classNode
@@ -878,7 +890,8 @@ class Function:
 
 
 class CallFunction:
-    def __init__(self, name, args):
+    def __init__(self, classNode, name, args):
+        self.classNode = classNode
         self.name = name
         self.args = args
 
@@ -886,7 +899,7 @@ class CallFunction:
         self.end = self.args.end
 
     def __repr__(self):
-        return f'Call-Function Node : [ {self.name} ({self.args}) ]'
+        return f'Call-Function Node : [ {self.classNode} | {self.name} ({self.args}) ]'
 
 
 class CallClass:
@@ -1063,13 +1076,13 @@ class ParseResult:
 
 
 masterscript = MasterScript([])
+metacode = []
 
-
-class Parser:
+class ParseMath:
     def __init__(self, scriptName, tokens):
         self.tokens = tokens
         self.scriptName = scriptName
-        self.idx = -1
+        self.tok_idx = -1
         self.advance()
 
     def reverse(self, amount=1):
@@ -1088,19 +1101,17 @@ class Parser:
 
     def parse(self):
         res = self.lib()
-
         if not res.error and self.currTok.type != EOF:
             return res.failure(
                 Error(
-                    "Expected '+', '-', '*', '/', '^', '==', '!=', ...", PARSEERROR,
+                    "Expected valid expression...", PARSEERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
-
+        
         masterscript.libs.append(res.node)
         return res
 
     def lib(self):
         res = ParseResult()
-        nodes = []
 
         script = res.register(self.script())
         if res.error:
@@ -1112,12 +1123,11 @@ class Parser:
         res = ParseResult()
         imports = []
         lib = None
-        metacode = []
         namespaces = []
         global_variables = []
         global_classes = []
         global_structs = []
-
+        
         moreStatements = True
         while moreStatements:
             if self.currTok.type == METAKEYWORD:
@@ -1145,7 +1155,6 @@ class Parser:
                         global_classes.append(node)
                     elif isinstance(node, Struct):
                         global_structs.append(node)
-
             elif self.currTok.type == EOF:
                 break
 
@@ -1235,35 +1244,70 @@ class Parser:
         res.registerAdvance()
         self.advance()
 
-        return res.success(node)
-
-    def expr(self):
+        metacode.append(node)
+        # return res.success(node)
+    
+    def namespace(self):
         res = ParseResult()
-        statements = []
-        start = self.currTok.start.copy()
+        classes = []
+        structs = []
 
-        if self.currTok.value == NAMESPACE:
-            nsStatements = res.register(self.namespace())
+        res.registerAdvance()
+        self.advance()
+
+        if not self.currTok.type == IDENTIFIER:
+            return res.failure(
+                Error(
+                    "Expected identifier.", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        name = self.currTok
+        res.registerAdvance()
+        self.advance()
+
+        if not self.currTok.type == LCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '{'.", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        # TODO: When a new expression was found asign the name of the namespace!
+
+        while True:
+            res.registerAdvance()
+            self.advance()
+
+            expr = res.register(self.expr())
+            if not expr:
+                break
             if res.error:
                 return res
+            
+            if isinstance(expr, Variable):
+                return res.failure(
+                    Error(
+                        "Cannot define variables inside a namespace.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+            elif isinstance(expr, Class):
+                expr.namespace = name
+                classes.append(expr)
+            elif isinstance(expr, Struct):
+                expr.namespace = name
+                structs.append(expr)
+            
+        res.registerAdvance()
+        self.advance()
 
-            for node in nsStatements:
-                statements.append(node)
-        elif self.currTok.value in (PUBLIC, PRIVATE, CLASS):
-            node = res.register(self.ClassOrVarOrFunc())
-            if res.error:
-                return res
-        elif self.currTok.value == STRUCT:
-            pass
-        elif self.currTok.type == METAKEYWORD:
-            metaNode = res.register(self.metacode())
-            if res.error:
-                return res
-            statements.append(metaNode)
-
+        if not self.currTok.type == RCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '}'.", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+            
+        return res.success(Namespace(name, classes, structs))
+    
     def ClassOrVarOrFunc(self):
         res = ParseResult()
-        start = self.currTok.start
 
         public = True if self.currTok.value == PUBLIC else False
         static = False
@@ -1307,73 +1351,20 @@ class Parser:
                 node.const = const
                 return res.success(node)
         elif self.currTok.type in VARTYPES:
-            pass  # Variables
+            node = res.register(self.defVar())
+            if res.error:
+                return res
+            
+            node.public = public
+            node.static = static
+            node.const = const
+            return res.success(node)
         elif self.currTok.type == IDENTIFIER:
-            pass  # Constructor
+            pass  # Constructor or VarAccess or FuncCall
 
         res.registerAdvance()
         self.advance()
-
-    def statement(self):
-        res = ParseResult()
-
-        statement = None
-        if self.currTok.value == WHILE:
-            pass
-        elif self.currTok.value == FOR:
-            pass
-        elif self.currTok.value == IF:
-            pass
-        elif self.currTok.value == RETURN:
-            res.registerAdvance()
-            self.advance()
-
-            if self.currTok.type == IDENTIFIER or VARTYPES:
-                returnTok = self.currTok
-                res.registerAdvance()
-                self.advance()
-            if not self.currTok.type == ENDCOLUMN:
-                return res.failure(
-                    Error(
-                        "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
-
-            statement = Return(None, returnTok)
-        elif self.currTok.value == CONTINUE:
-            res.registerAdvance()
-            self.advance()
-            
-            if not self.currTok.type == ENDCOLUMN:
-                return res.failure(
-                    Error(
-                        "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
-            
-            return res.success(Continue(None, self.currTok.start, self.currTok.end))
-        elif self.currTok.value == BREAK:
-            res.registerAdvance()
-            self.advance()
-            
-            if not self.currTok.type == ENDCOLUMN:
-                return res.failure(
-                    Error(
-                        "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
-                
-            return res.success(Break(None, self.currTok.start, self.currTok.end))
-        elif self.currTok.type == IDENTIFIER:
-            pass # CallFunc- Or CallClassNode
-        else:
-            node = res.register(self.ClassOrVarOrFunc())
-            if res.error:
-                return res
-            statement = node
-
-        return res.success(statement)
-
-    def Constructor(self):
-        pass
-
+    
     def _class(self):
         res = ParseResult()
 
@@ -1403,7 +1394,7 @@ class Parser:
         externNameSpaces = res.register(self.usings())
 
         while True:
-            node = res.tryRegister(self.ClassOrVarOrFunc())
+            node = res.tryRegister(self.expr())
             if not node:
                 self.reverse(res.reverseCount)
                 break
@@ -1432,6 +1423,36 @@ class Parser:
 
         return res.success(Class(self.scriptName, None, externNameSpaces, variables, False, False, name, constructors, functions))
 
+    def usings(self):
+        res = ParseResult()
+
+        usings = []
+        if self.currTok.value == USING:
+            while True:
+
+                if not self.currTok.value == USING:
+                    break
+
+                res.registerAdvance()
+                self.advance()
+
+                if not self.currTok.type == IDENTIFIER:
+                    return res.failure(
+                        Error(
+                            "Expected indentifier.", SYNTAXERROR,
+                            self.currTok.start, self.currTok.end, self.scriptName))
+
+                name = self.currTok.value
+                usings.append(Using(name))
+
+                res.registerAdvance()
+                self.advance()
+
+        return res.success(usings)
+
+    def Constructor(self):
+        pass
+    
     def function(self):
         res = ParseResult()
 
@@ -1510,7 +1531,7 @@ class Parser:
                 break
             if res.error:
                 return res
-            
+
             if isinstance(statement, Return):
                 statement.functionNode = name
                 body.append(statement)
@@ -1529,75 +1550,226 @@ class Parser:
                         self.currTok.start, self.currTok.end, self.scriptName))
             elif isinstance(statement, If) or isinstance(statement, For) or isinstance(statement, While):
                 statement.functionNode = name
-                
+
         if not self.currTok.type == RCBRACKET:
             return res.failure(
                 Error(
                     "Expected '}'.", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
-            
+
         return res.success(Function(None, variables, False, False, False, False, returnType, name, args, body))
-
-    def usings(self):
+    
+    def statement(self):
         res = ParseResult()
 
-        usings = []
-        if self.currTok.value == USING:
-            while True:
+        statement = None
+        if self.currTok.value == WHILE:
+            pass
+        elif self.currTok.value == FOR:
+            pass
+        elif self.currTok.value == IF:
+            pass
+        elif self.currTok.value == RETURN:
+            res.registerAdvance()
+            self.advance()
 
-                if not self.currTok.value == USING:
-                    break
+            returnTok = res.register(self.expr())
+            if res.error:
+                return res
+            
+            res.registerAdvance()
+            self.advance()
+            if not self.currTok.type == ENDCOLUMN:
+                return res.failure(
+                    Error(
+                        "Expected ';'.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
 
-                res.registerAdvance()
-                self.advance()
+            statement = Return(None, returnTok)
+        elif self.currTok.value == CONTINUE:
+            res.registerAdvance()
+            self.advance()
 
-                if not self.currTok.type == IDENTIFIER:
-                    return res.failure(
-                        Error(
-                            "Expected indentifier.", SYNTAXERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
+            if not self.currTok.type == ENDCOLUMN:
+                return res.failure(
+                    Error(
+                        "Expected ';'.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
 
-                name = self.currTok.value
-                usings.append(Using(name))
+            return res.success(Continue(None, self.currTok.start, self.currTok.end))
+        elif self.currTok.value == BREAK:
+            res.registerAdvance()
+            self.advance()
 
-                res.registerAdvance()
-                self.advance()
+            if not self.currTok.type == ENDCOLUMN:
+                return res.failure(
+                    Error(
+                        "Expected ';'.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
 
-        return res.success(usings)
-
-    def namespace(self):
+            return res.success(Break(None, self.currTok.start, self.currTok.end))
+        elif self.currTok.type == IDENTIFIER:
+            pass  # CallFunc or varaccess
+        else:
+            node = res.register(self.ClassOrVarOrFunc())
+            if res.error:
+                return res
+            statement = node
+            
+        return res.success(statement)
+    
+    def defVar(self):
         res = ParseResult()
-        statements = []
-
+        
+        type = self.currTok.value
         res.registerAdvance()
         self.advance()
-
+        
         if not self.currTok.type == IDENTIFIER:
             return res.failure(
                 Error(
                     "Expected identifier.", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
-
-        name = self.currTok
+        
+        name = self.currTok.value
         res.registerAdvance()
         self.advance()
-
-        if not self.currTok.type == LCBRACKET:
+        
+        if not self.currTok.type == EQUALS:
             return res.failure(
                 Error(
-                    "Expected '{'.", SYNTAXERROR,
+                    "Expected '='.", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+        
+        value = res.register(self.expr())
+        if res.error:
+            return res
+        
+        res.registerAdvance()
+        self.advance()
+        
+        if not self.currTok.type == ENDCOLUMN:
+            return res.failure(
+                Error(
+                    "Expected ';'.", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
 
-        # TODO: When a new expression was found asign the name of the namespace!
+        return res.success(Variable(None, None, None, False, False, False, type, name, value))
+    
+    def atom(self):
+        res = ParseResult()
+        tok = self.currTok
 
-        moreStatements = True
-        while moreStatements:
+        if tok.type in (INT, FLT, DBL):
             res.registerAdvance()
             self.advance()
-
+            return res.success(Number(tok.type, tok))
+        elif tok.type == IDENTIFIER:
+            res.registerAdvance()
+            self.advance()
+            return res.success(VarAccess(None, tok, tok.start, tok.end))
+        elif tok.type == LBRACKET:
+            res.registerAdvance()
+            self.advance()
             expr = res.register(self.expr())
+            if res.error: return res
+            if self.currTok.type == RBRACKET:
+                res.registerAdvance()
+                self.advance()
+                return res.success(expr)
+            else:
+                return res.failure(
+                    Error(
+                        "Expected ')'", SyntaxError,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+        elif tok.type == KEYWORD:
+            node = res.register(self.expr())
             if res.error:
                 return res
+            
+            return res.success(node)
+        
+        return res.failure(
+            Error(
+                "Expected number, identifier, '+', '-' or '('", SyntaxError,
+                self.currTok.start, self.currTok.end, self.scriptName))
+
+    def power(self):
+        return self.bin_op(self.atom, POWER, self.factor)
+
+    def factor(self):
+        res = ParseResult()
+        tok = self.currTok
+
+        if tok.type in (PLUS, MINUS):
+            res.registerAdvance()
+            self.advance()
+            factor = res.register(self.factor())
+            if res.error: return res
+            return res.success(UnaryNode(tok, factor))
+
+        return self.power()
+
+    def term(self):
+        return self.bin_op(self.factor, (MULTIPLY, DIVIDE))
+
+    def expr(self):
+        res = ParseResult()
+
+        if self.currTok.type == KEYWORD:
+            node = res.register(self.ClassOrVarOrFunc())
+            if res.error:
+                return res
+            
+            return res.success(node)
+        elif self.currTok.value == NAMESPACE:
+            node = res.register(self.namespace())
+            if res.error:
+                return res
+
+            return res.success(node)
+        elif self.currTok.value in (PUBLIC, PRIVATE, CLASS):
+            node = res.register(self.ClassOrVarOrFunc())
+            if res.error:
+                return res
+            
+            return res.success(node)
+        elif self.currTok.value == STRUCT:
+            pass
+        elif self.currTok.type == METAKEYWORD:
+            metaNode = res.register(self.metacode())
+            if res.error:
+                return res
+            
+            return res.success(metaNode)
+
+        node = res.register(self.bin_op(self.term, (PLUS, MINUS)))
+
+        if res.error:
+            return res.failure(
+                Error(
+                    "Expected variable, identifier, '+', '-' or '('", SyntaxError,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        return res.success(node)
+
+    def bin_op(self, func_a, ops, func_b=None):
+        if func_b == None:
+            func_b = func_a
+        
+        res = ParseResult()
+        left = res.register(func_a())
+        if res.error: return res
+
+        while self.currTok.type in ops:
+            op_tok = self.currTok
+            res.registerAdvance()
+            self.advance()
+            right = res.register(func_b())
+            if res.error: return res
+            left = BinOpNode(left, op_tok, right)
+
+        return res.success(left)
 
 
 ####################
@@ -1610,5 +1782,8 @@ def run(fn, text):
     tokens, error = lexer.genTokens()
     if error:
         return None, error
-
-    return tokens, None
+    
+    parser = ParseMath(fn, tokens)
+    ast = parser.parse()
+    
+    return ast.node, ast.error
