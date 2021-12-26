@@ -179,6 +179,11 @@ DIGITS = '0123456789'
 LETGITS = LETTERS + DIGITS
 FLOATMIN = 0.0000000000000001
 
+# Extra types
+BON = 'binopnode'
+UNN = 'unarynode'
+VAC = 'varaccess'
+
 # Error types
 TESTERROR = 'TestError'
 ILLEGALCHAR = 'IllegalChar'
@@ -215,7 +220,7 @@ class Position:
 
     def copy(self):
         return Position(self.idx, self.ln, self.col, self.fn, self.ftxt)
-    
+
     def __repr__(self):
         return f'{self.ln}'
 
@@ -613,7 +618,7 @@ class MasterScript:
         self.libs = libs
 
     def __repr__(self):
-        return 'MASTERSCRIPT'
+        return f'MASTERSCRIPT [ {self.libs} ]'
 
 
 class Import:
@@ -623,8 +628,6 @@ class Import:
     def __repr__(self):
         return f'Import Node : [ {self.lib} ]'
 
-
-# If there are no namespaces everything will be put into a 'virtual' namespace
 # which contains every class etc. of the script!
 # Variables of another script can only be accessed as long as they are public / not a constant / and as long
 # as the script has the other script's library imported!
@@ -655,13 +658,15 @@ class Lib:
 
 
 class Namespace:
-    def __init__(self, name, classes, structs):
+    def __init__(self, script, lib, name, classes, structs):
+        self.script = script
+        self.lib = lib
         self.name = name
         self.classes = classes
         self.structs = structs
 
     def __repr__(self):
-        return f'Namespace Node : [ {self.name} | {self.classes} | {self.structs} ]'
+        return f'Namespace Node : [ {self.script} | {self.lib} | {self.name} | {self.classes} | {self.structs} ]'
 
 
 class Using:
@@ -707,6 +712,9 @@ class VarAccess:
 
     def __repr__(self):
         return f'VarAccess Node : [ {self.classNode} | {self.varName} ]'
+    
+    def getType(self):
+        return VAC
 
 
 class List:
@@ -727,17 +735,8 @@ class List:
         condition = 'const' if self.const != None else condition
         return f'List Node : [ {self.classNode} | {self.public} | {condition} | {self.type} | {self.name} | {self.elements} ]'
 
-
-class Identifier:
-    def __init__(self, type, name):
-        self.type = type
-        self.name = name
-
-        self.start = self.name.start
-        self.end = self.name.end
-
-    def __repr__(self):
-        return f'Idenfifier Node : [ {self.name} ]'
+    def getType(self):
+        return self.type
 
 
 class BinOpNode:
@@ -751,6 +750,9 @@ class BinOpNode:
 
     def __repr__(self):
         return f'Binary Op Node : [ {self.left} {self.op} {self.right} ]'
+    
+    def getType(self):
+        return BON
 
 
 class UnaryNode:
@@ -763,6 +765,9 @@ class UnaryNode:
 
     def __repr__(self):
         return f'Unary Node : [ {self.op} {self.node} ]'
+    
+    def getType(self):
+        return UNN
 
 
 class If:
@@ -817,7 +822,7 @@ class While:
 
 # A struct has to have at least ONE constrctor!
 class Struct:
-    def __init__(self, script, namespace, variables, name, constructors):
+    def __init__(self, script, lib, namespace, variables, name, constructors):
         self.script = script
         self.namespace = namespace
         self.variables = variables
@@ -828,7 +833,7 @@ class Struct:
         self.end = self.constructors[0].end
 
     def __repr__(self):
-        return f'Class Node : [ {self.namespace} | {self.variables} | {self.name} | {self.constructors} ]'
+        return f'Class Node : [ {self.script} | {self.lib} | {self.namespace} | {self.variables} | {self.name} | {self.constructors} ]'
 
 # Doesn't have to have a cunstructor. Variables can be changeg by accessing the Class like this:
 #
@@ -838,8 +843,9 @@ class Struct:
 
 
 class Class:
-    def __init__(self, script, namespace, externNameSpaces, variables, public, static, name, constructors, body):
+    def __init__(self, script, lib, namespace, externNameSpaces, variables, public, static, name, constructors, body):
         self.script = script
+        self.lib = lib
         self.namespace = namespace
         self.externNameSpaces = externNameSpaces
         self.variables = variables
@@ -853,7 +859,7 @@ class Class:
         self.end = self.name.end
 
     def __repr__(self):
-        return f'Class Node : [ {self.namespace} | {self.externNameSpaces} | {self.variables} | {self.public} | {self.static} | {self.name} | {self.constructors} | {self.body} ]'
+        return f'Class Node : [ {self.script} | {self.lib} | {self.namespace} | {self.externNameSpaces} | {self.variables} | {self.public} | {self.static} | {self.name} | {self.constructors} | {self.body} ]'
 
 # It can only have the returntype and arguments of the original function.
 # The overriden function will only be overriden for the script the override function is being called
@@ -924,8 +930,8 @@ class CallClass:
 class Return:
     def __init__(self, functionNode, returnTok):
         self.functionNode = functionNode
-        self.returnType = returnTok.type
-        self.returnValue = returnTok.value
+        self.returnType = returnTok.getType()
+        self.returnValue = returnTok
 
         self.start = returnTok.start
         self.end = returnTok.end
@@ -982,6 +988,9 @@ class Number:
     def __repr__(self):
         return f'Number Node : [ {self.type} : {self.value} ]'
 
+    def getType(self):
+        return self.type
+
 
 class String:
     def __init__(self, type, value):
@@ -993,6 +1002,9 @@ class String:
 
     def __repr__(self):
         return f'String Node: [ {self.type} : {self.value} ]'
+
+    def getType(self):
+        return self.type
 
 
 class Bool:
@@ -1006,6 +1018,9 @@ class Bool:
     def __repr__(self):
         return f'Bool Node: [ {self.type} : {self.value} ]'
 
+    def getType(self):
+        return self.type
+
 
 class Type:
     def __init__(self, type, value):
@@ -1017,6 +1032,9 @@ class Type:
 
     def __repr__(self):
         return f'Type Node: [ {self.type} : {self.value} ]'
+
+    def getType(self):
+        return self.type
 
 
 class Var:
@@ -1030,6 +1048,9 @@ class Var:
     def __repr__(self):
         return f'Var Node: [ {self.type} : {self.value} ]'
 
+    def getType(self):
+        return self.type
+
 
 class Byte:
     def __init__(self, type, value):
@@ -1041,6 +1062,9 @@ class Byte:
 
     def __repr__(self):
         return f'Byte Node: [ {self.type} : {self.value} ]'
+
+    def getType(self):
+        return self.type
 
 
 class ParseResult:
@@ -1142,7 +1166,7 @@ class Parser:
         moreStatements = True
         while moreStatements:
             if self.currTok.type == METAKEYWORD:
-                metaNode = res.register(self.metacode())
+                metaNode = res.register(self.metacode(False))
                 if res.error:
                     return res
 
@@ -1158,12 +1182,16 @@ class Parser:
                 if isinstance(node, MetaCode):
                     metacode.append(node)
                 elif isinstance(node, Namespace):
+                    node.lib = lib
                     namespaces.append(node)
                 elif isinstance(node, Variable):
+                    node.lib = lib
                     global_variables.append(node)
                 elif isinstance(node, Class):
+                    node.lib = lib
                     global_classes.append(node)
                 elif isinstance(node, Struct):
+                    node.lib = lib
                     global_structs.append(node)
             elif self.currTok.type == EOF:
                 break
@@ -1171,22 +1199,22 @@ class Parser:
                 return res.failure(
                     Error(
                         "No valid expression found.", PARSEERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName)) 
-            
+                        self.currTok.start, self.currTok.end, self.scriptName))
+
             res.registerAdvance()
             self.advance()
             if self.currTok.type == EOF:
                 moreStatements = False
-            
+
         # Final touch to metacode
         for node in metacode:
             if node.type == DEFINE:
                 global_variables.append(
-                    Variable(lib, None, None, True, False, True, node.value.type, node.value, node.metVarValue))
+                    Variable(lib, None, None, True, False, True, DEFINE, node.value, node.metVarValue))
 
         return res.success(Script(self.scriptName, imports, lib, namespaces, global_variables, global_classes, global_structs))
 
-    def metacode(self):
+    def metacode(self, append):
         res = ParseResult()
         node = None
 
@@ -1225,13 +1253,12 @@ class Parser:
             res.registerAdvance()
             self.advance()
 
-            if not self.currTok.type in VARTYPES:
+            value = res.register(self.expr())
+            if res.error or isinstance(value, MetaCode) or isinstance(value, Class) or isinstance(value, Function) or isinstance(value, Struct):
                 return res.failure(
                     Error(
-                        "Expected value.", SYNTAXERROR,
+                        "Expected valid metavalue.", SYNTAXERROR,
                         self.currTok.start, self.currTok.end, self.scriptName))
-
-            value = self.currTok
 
             node = MetaCode(DEFINE, name, value)
         elif self.currTok.value == METIF:
@@ -1261,12 +1288,9 @@ class Parser:
         elif self.currTok.value == METENDIF:
             node = MetaCode(METENDIF, self.currTok)
 
-        res.registerAdvance()
-        self.advance()
-
-        metacode.append(node)
+        if append:
+            metacode.append(node)
         return res.success(node)
-        # return res.success(node)
 
     def namespace(self):
         res = ParseResult()
@@ -1292,14 +1316,13 @@ class Parser:
                     "Expected '{'.", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
 
-        # TODO: When a new expression was found asign the name of the namespace!
-
         while True:
             res.registerAdvance()
             self.advance()
 
-            expr = res.register(self.expr())
+            expr = res.tryRegister(self.expr())
             if not expr:
+                self.reverse(res.reverseCount)
                 break
             if res.error:
                 return res
@@ -1325,14 +1348,14 @@ class Parser:
                     "Expected '}'.", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
 
-        return res.success(Namespace(name, classes, structs))
+        return res.success(Namespace(self.scriptName, None, name, classes, structs))
 
     def ClassOrVarOrFunc(self):
         res = ParseResult()
 
         funcTypes = VARTYPES
         funcTypes.append(VOID)
-        
+
         public = True if self.currTok.value == PUBLIC else False
         static = False
         const = False
@@ -1383,14 +1406,14 @@ class Parser:
             node.static = static
             node.const = const
             return res.success(node)
-        
+
         # TODO : make a check for a Constructor
 
         return res.failure(
-                Error(
-                    "Expected valid class, variable or function...", PARSEERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
-        
+            Error(
+                "Expected valid class, variable or function...", PARSEERROR,
+                self.currTok.start, self.currTok.end, self.scriptName))
+
     def _class(self):
         res = ParseResult()
 
@@ -1449,7 +1472,7 @@ class Parser:
                     "Expected '}'", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
 
-        return res.success(Class(self.scriptName, None, externNameSpaces, variables, False, False, name, constructors, functions))
+        return res.success(Class(self.scriptName, None, None, externNameSpaces, variables, False, False, name, constructors, functions))
 
     def usings(self):
         res = ParseResult()
@@ -1473,13 +1496,13 @@ class Parser:
 
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == ENDCOLUMN:
                 return res.failure(
                     Error(
                         "Expected ';'.", SYNTAXERROR,
                         self.currTok.start, self.currTok.end, self.scriptName))
-            
+
             res.registerAdvance()
             self.advance()
 
@@ -1684,23 +1707,18 @@ class Parser:
         if not self.currTok.type == EQUALS:
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == ENDCOLUMN:
                 return res.failure(
-                Error(
-                    "Expected ';'.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
-            
+                    Error(
+                        "Expected ';'.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+
             return res.success(Variable(None, None, None, False, False, False, type, name, None))
-        
-            # return res.failure(
-            #     Error(
-            #         "Expected '='.", SYNTAXERROR,
-            #         self.currTok.start, self.currTok.end, self.scriptName))
 
         res.registerAdvance()
         self.advance()
-        
+
         value = res.register(self.expr())
         if res.error:
             return res
@@ -1807,16 +1825,10 @@ class Parser:
                 return res
 
             return res.success(node)
-        # elif self.currTok.value in (PUBLIC, PRIVATE, CLASS):
-        #     node = res.register(self.ClassOrVarOrFunc())
-        #     if res.error:
-        #         return res
-
-        #     return res.success(node)
         elif self.currTok.value == STRUCT:
             pass
         elif self.currTok.type == METAKEYWORD:
-            metaNode = res.register(self.metacode())
+            metaNode = res.register(self.metacode(True))
             if res.error:
                 return res
 
@@ -1874,6 +1886,10 @@ def run(fn, text):
 #
 # - VarAccess or FuncCall
 # - Check for cunstructors
-# - Fix Return!
 # > File "D:\PythonProjects\SimpleC\SimpelC.py", line 927, in __init__
 #     self.returnType = returnTok.type
+# - Lists
+# - Comperation operations (!= /= ? < > >= <= & |) 
+# - Fix namespaces
+# > ParseError in <Test2.sc> (line: 6, 48):
+#       No valid expression found.
