@@ -250,12 +250,14 @@
 
     namespace someNameSpace
     {
+        namespace otherSpace { ... }
         public class a { ... }
     }
 
     private class program
     {
         using someNameSpace;
+        using someNameSpace.otherSpace;
         
         private void main()
         {
@@ -266,7 +268,7 @@
     ->  The namespace 'protect' a class/struct from the outside script.
         By using the namespace in a class, the class gets access to the namespace.
         One could also put the class inside the namespace.
-        Namespaces cannot be nested!
+        Namespaces can be nested!
         Namespaces can be in different scripts using the same namespace name:
         By that the content of one namespace can grow bigger through out many scripts.
         Use 'var' to define a class. Type of 'var' is unsigned so it can have any other type!
