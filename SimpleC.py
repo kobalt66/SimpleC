@@ -57,6 +57,7 @@ FOR = 'for'
 EACH = 'each'
 CLASS = 'class'
 STRUCT = 'struct'
+CONSTRUCTOR = 'constructor'
 PUBLIC = 'public'
 PRIVATE = 'private'
 PROTECTED = 'protected'
@@ -698,12 +699,15 @@ class Variable:
         self.name = name
         self.value = value
 
-        if self.value:
+        if self.value and not isinstance(self.value, str):
             self.start = self.value.start
             self.end = self.value.end if self.value else self.name.end
-        else:
+        elif not isinstance(self.name, str):
             self.start = self.name.start
             self.end = self.name.end
+        else:
+            self.start = None
+            self.end = None
 
     def __repr__(self):
         condition = 'static' if self.static else ''
@@ -771,7 +775,7 @@ class ClassAccess:
 
     def __repr__(self):
         return f'Call-Class Node : [ {self.name} ({self.args}) ]'
-    
+
     def getType(self):
         return CLA
 
@@ -896,9 +900,11 @@ class While:
 
 # A struct has to have at least ONE constrctor!
 class Struct:
-    def __init__(self, script, lib, namespace, variables, name, constructors):
+    def __init__(self, script, lib, namespace, externNameSpaces, variables, name, constructors):
         self.script = script
+        self.lib = lib
         self.namespace = namespace
+        self.externNameSpaces = externNameSpaces
         self.variables = variables
         self.name = name
         self.constructors = constructors
@@ -907,7 +913,7 @@ class Struct:
         self.end = self.constructors[0].end
 
     def __repr__(self):
-        return f'Class Node : [ {self.script} | {self.lib} | {self.namespace} | {self.variables} | {self.name} | {self.constructors} ]'
+        return f'Struct Node : [ {self.script} | {self.lib} | {self.namespace} | {self.externNameSpaces} | {self.variables} | {self.name} | {self.constructors} ]'
 
 # Doesn't have to have a cunstructor. Variables can be changeg by accessing the Class like this:
 #
@@ -968,8 +974,11 @@ class Function:
         self.args = args
         self.body = body
 
-        self.start = self.returnType.start
-        self.end = self.name.end
+        if not isinstance(self.returnType, str):
+            self.start = self.returnType.start if self.returnType else None
+        else:
+            self.start = None
+        self.end = None
 
     def __repr__(self):
         return f'Function Node : [ {self.classNode} | {self.variables} | {self.constructor} | {self.public} | {self.static} | {self.protected} | {self.returnType} | {self.name} | {self.args} | {self.body} ]'
@@ -1457,12 +1466,85 @@ class Parser:
             node.const = const
             return res.success(node)
 
-        # TODO : make a check for a Constructor
-
         return res.failure(
             Error(
                 "Expected valid class, variable or function...", PARSEERROR,
                 self.currTok.start, self.currTok.end, self.scriptName))
+
+    def struct(self):
+        res = ParseResult()
+        variables = []
+        constructors = []
+
+        res.registerAdvance()
+        self.advance()
+
+        if not self.currTok.type == IDENTIFIER:
+            return res.failure(
+                Error(
+                    "Expected indentifier.", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        name = self.currTok
+        res.registerAdvance()
+        self.advance()
+
+        if not self.currTok.type == LCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '{'", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        res.registerAdvance()
+        self.advance()
+        externNameSpaces = res.register(self.usings())
+
+        while True:
+            node = res.tryRegister(self.expr())
+            if not node:
+                self.reverse(res.reverseCount)
+                break
+            if res.error:
+                return res
+
+            node.classNode = name
+            if isinstance(node, Class) or isinstance(node, Struct):
+                return res.failure(
+                    Error(
+                        "It is not possible to define a class or struct inside a struct!", PARSEERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+            elif isinstance(node, Variable):
+                node.public = True
+                if node.static:
+                    return res.failure(
+                        Error(
+                            "A variable cannot be static inside a struct.", SYNTAXERROR,
+                            self.currTok.start, self.currTok.end, self.scriptName))
+                variables.append(node)
+            elif isinstance(node, Function):
+                if node.constructor:
+                    constructors.append(node)
+                else:
+                    return res.failure(
+                        Error(
+                            "It is not possible to define a function inside a struct!", PARSEERROR,
+                            self.currTok.start, self.currTok.end, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+
+        if not self.currTok.type == RCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '}'", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+        if len(constructors) == 0:
+            return res.failure(
+                Error(
+                    "Expected at least one constructor!", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        return res.success(Struct(self.scriptName, None, None, externNameSpaces, variables, name, constructors))
 
     def _class(self):
         res = ParseResult()
@@ -1503,10 +1585,10 @@ class Parser:
                 return res
 
             node.classNode = name
-            if isinstance(node, Class):
+            if isinstance(node, Class) or isinstance(node, Struct):
                 return res.failure(
                     Error(
-                        "It is not possible to define a class inside a class!", PARSEERROR,
+                        "It is not possible to define a class or struct inside a class!", PARSEERROR,
                         self.currTok.start, self.currTok.end, self.scriptName))
             elif isinstance(node, Variable):
                 variables.append(node)
@@ -1558,8 +1640,182 @@ class Parser:
 
         return res.success(usings)
 
-    def Constructor(self):
-        pass
+    def constructor(self):
+        res = ParseResult()
+
+        args = []
+        body = []
+        variables = []
+
+        if not self.currTok.type == IDENTIFIER:
+            return res.failure(
+                Error(
+                    "Expected identifier.", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        name = self.currTok
+        res.registerAdvance()
+        self.advance()
+
+        if not self.currTok.type == LBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '('.", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        res.registerAdvance()
+        self.advance()
+
+        # Get parameters
+        while True:
+            if self.currTok.type == RBRACKET:
+                res.registerAdvance()
+                self.advance()
+                break
+            if not self.currTok.type == VARTYPE:
+                return res.failure(
+                    Error(
+                        "Expected variable type.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+
+            type = self.currTok
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == IDENTIFIER:
+                return res.failure(
+                    Error(
+                        "Expected identifier.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+
+            argName = self.currTok
+            res.registerAdvance()
+            self.advance()
+
+            args.append(Variable(None, None, None, False,
+                        False, True, type, argName, None))
+
+            if self.currTok.type == RBRACKET:
+                res.registerAdvance()
+                self.advance()
+                break
+            if not self.currTok.type == COMMA:
+                return res.failure(
+                    Error(
+                        "Expected ','.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+
+        # Alternativ variable setup
+        if self.currTok.type == COLON:
+            while True:
+                res.registerAdvance()
+                self.advance()
+
+                if not self.currTok.type == IDENTIFIER:
+                    return res.failure(
+                        Error(
+                            "Expected identifier.", SYNTAXERROR,
+                            self.currTok.start, self.currTok.end, self.scriptName))
+
+                varName = self.currTok.value
+                res.registerAdvance()
+                self.advance()
+
+                if not self.currTok.type == LBRACKET:
+                    return res.failure(
+                        Error(
+                            "Expected '('.", SYNTAXERROR,
+                            self.currTok.start, self.currTok.end, self.scriptName))
+
+                res.registerAdvance()
+                self.advance()
+
+                if not self.currTok.type == IDENTIFIER:
+                    return res.failure(
+                        Error(
+                            "Expected identifier.", SYNTAXERROR,
+                            self.currTok.start, self.currTok.end, self.scriptName))
+
+                valueVarName = self.currTok.value
+                res.registerAdvance()
+                self.advance()
+                
+                type = None
+                for i in args:
+                    if i.name.value == valueVarName:
+                        type = i.type
+                        break
+                if not type:
+                    return res.failure(
+                        Error(
+                            f"Parameter with the name '{valueVarName}' does not exist.", PARSEERROR,
+                            self.currTok.start, self.currTok.end, self.scriptName))
+                
+                if not self.currTok.type == RBRACKET:
+                    return res.failure(
+                        Error(
+                            "Expected ')'.", SYNTAXERROR,
+                            self.currTok.start, self.currTok.end, self.scriptName))
+
+                body.append(Variable(None, None, None, False, False,
+                            False, type, varName, valueVarName))
+                res.registerAdvance()
+                self.advance()
+
+                if not self.currTok.type == COMMA:
+                    break
+
+        if not self.currTok.type == LCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '{'.", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        # Build Body
+        while True:
+            res.registerAdvance()
+            self.advance()
+
+            statement = res.tryRegister(self.statement())
+            if not statement:
+                self.reverse(res.reverseCount)
+                break
+            if res.error:
+                return res
+
+            if isinstance(statement, Variable):
+                statement.public = False
+                if statement.static or statement.const:
+                    return res.failure(
+                        Error(
+                            "'public', 'static' and 'const' are not allowed in a function.", SYNTAXERROR,
+                            self.currTok.start, self.currTok.end, self.scriptName))
+                else:
+                    variables.append(statement)
+            elif isinstance(statement, Class) or isinstance(statement, Struct) or isinstance(statement, Function):
+                return res.failure(
+                    Error(
+                        "Functions, classes and structs cannot be defined inside a constructor.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+            elif isinstance(statement, Break) or isinstance(statement, Continue) or isinstance(statement, Return):
+                return res.failure(
+                    Error(
+                        "Break points, continues and returns cannot be defined inside a constructor.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+            elif isinstance(statement, If) or isinstance(statement, For) or isinstance(statement, While):
+                statement.functionNode = name
+                body.append(statement)
+
+        if not self.currTok.type == RCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '}'.", SYNTAXERROR,
+                    self.currTok.start, self.currTok.end, self.scriptName))
+
+        return res.success(Function(None, variables, True, False, False, False, CONSTRUCTOR, None, args, body))
 
     def function(self):
         res = ParseResult()
@@ -1663,10 +1919,15 @@ class Parser:
                             self.currTok.start, self.currTok.end, self.scriptName))
                 else:
                     variables.append(statement)
-            elif isinstance(statement, Class) or isinstance(statement, Function):
+            elif isinstance(statement, Class) or isinstance(statement, Struct) or isinstance(statement, Function):
                 return res.failure(
                     Error(
-                        "Functions and classes cannot be defined inside a function.", SYNTAXERROR,
+                        "Functions, classes and structs cannot be defined inside a function.", SYNTAXERROR,
+                        self.currTok.start, self.currTok.end, self.scriptName))
+            elif isinstance(statement, Break) or isinstance(statement, Continue):
+                return res.failure(
+                    Error(
+                        "Break points and continues cannot be defined inside a function.", SYNTAXERROR,
                         self.currTok.start, self.currTok.end, self.scriptName))
             elif isinstance(statement, If) or isinstance(statement, For) or isinstance(statement, While):
                 statement.functionNode = name
@@ -1730,7 +1991,7 @@ class Parser:
 
             return res.success(Break(None, self.currTok.start, self.currTok.end))
         elif self.currTok.type == IDENTIFIER:
-            pass  # CallFunc or varaccess
+            pass  # varaccess, dotaccess, ...
         elif self.currTok.value in VARTYPES:
             node = res.register(self.defVar())
             if res.error:
@@ -1872,7 +2133,17 @@ class Parser:
 
             return res.success(node)
         elif self.currTok.value == STRUCT:
-            pass
+            node = res.register(self.struct())
+            if res.error:
+                return res
+
+            return res.success(node)
+        elif self.currTok.value == CONSTRUCTOR:
+            node = res.register(self.constructor())
+            if res.error:
+                return res
+
+            return res.success(node)
         elif self.currTok.type == KEYWORD:
             node = res.register(self.ClassOrVarOrFunc())
             if res.error:
@@ -1936,7 +2207,7 @@ def run(fn, text):
 
 # TODOs :
 #
-# - VarAccess or FuncCall
+# - VarAccess, DotAccess, ...
 # - Check for cunstructors
 # - Lists
 # - Comperation operations (!= /= ? < > >= <= & |)
