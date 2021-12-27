@@ -21,9 +21,11 @@ namespace nSpace
             : b(a), b(c)
             {
             }
-        #metif MetaVar
-            public static protected someClass SomeFunc(var a) { return; }
-        #metendif
+
+            public static void Func(var a, bol checked) 
+            {
+                return null;
+            }
         }
     }
     namespace otherSpace2
@@ -38,3 +40,5 @@ namespace nSpace
         }
     }
 }
+
+// namespace nSpace { namespace otherSpace { public static class someClass { #metif MetaVar public static protected someClass SomeFunc(var a) { return; } #metendif } } private class Class { public void func() { return; } } }
