@@ -9,8 +9,6 @@ The language probably has some bugs that might be unfixable for me because of my
 programming languages are built up.
 
 Because this language is called SimpelC it of course does not have all the complex stuff C# or C++ provide.
-E.g. you cannot put a namespace into a namespace and you cannot put a class into a class. (Just to keep it simple)
-
 Just keep in mind that this project is just a fun side project.
 
 It would be awesome if you might get some inspiration from my work. :)
