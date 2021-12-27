@@ -1,8 +1,8 @@
 ##############################################################################################
-# This is the compiler for SimpelC | development start: 18.12.2021 | release date: ?         #
+# This is the compiler for SimpleC | development start: 18.12.2021 | release date: ?         #
 ##############################################################################################
 #                                                                                            #
-# - SimpelC is mixture of many C-like programming languages                                  #
+# - SimpleC is mixture of many C-like programming languages                                  #
 # - It's kind of an interpretation of what a C-like programming language could look like     #
 # - It's supposed to be an easy to use language with library, namespace, [...] support       #
 # - The syntax is also supposed to be clean and easy to read                                 #
@@ -1886,7 +1886,7 @@ def run(fn, text):
 #
 # - VarAccess or FuncCall
 # - Check for cunstructors
-# > File "D:\PythonProjects\SimpleC\SimpelC.py", line 927, in __init__
+# > File "D:\PythonProjects\SimpleC\SimpleC.py", line 927, in __init__
 #     self.returnType = returnTok.type
 # - Lists
 # - Comperation operations (!= /= ? < > >= <= & |) 
