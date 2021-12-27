@@ -212,16 +212,16 @@
         private int a;
         private str b;
 
-        someClass(int a, str b)
+        constructor(int a, str b)
             : a(a), b(b)
         {
             ...
         }
-        someClass(int a) : a(a)
+        constructor(int a) : a(a)
         {
             b = 0;
         }
-        someClass(int a, str b)
+        constructor(int a, str b)
         {
             this.a = a;
             this.b = b;
@@ -233,7 +233,7 @@
         int a;
         str b;
 
-        someStruct(int a, str b) : a(a), b(b)
+        constructor(int a, str b) : a(a), b(b)
         {
             
         }  
