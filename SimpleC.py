@@ -186,6 +186,11 @@ FLOATMIN = 0.0000000000000001
 BON = 'binopnode'
 UNN = 'unarynode'
 VAC = 'varaccess'
+DOA = 'dotaccess'
+STA = 'structaccess'
+CLA = 'classaccess'
+FUA = 'funcaccess'
+
 
 # Error types
 TESTERROR = 'TestError'
@@ -631,9 +636,10 @@ class Import:
     def __repr__(self):
         return f'Import Node : [ {self.lib} ]'
 
-# which contains every class etc. of the script!
 # Variables of another script can only be accessed as long as they are public / not a constant / and as long
 # as the script has the other script's library imported!
+
+
 class Script:
     def __init__(self, name, imports, lib, metacode, namespaces, global_variables, global_classes, global_structs):
         self.name = name
@@ -656,9 +662,6 @@ class Lib:
 
     def __repr__(self):
         return f'Lib Node : [ {self.name} | {self.scripts} ]'
-
-
-# Cannot have variables
 
 
 class Namespace:
@@ -712,15 +715,81 @@ class VarAccess:
     def __init__(self, classNode, varName, start, end):
         self.classNode = classNode
         self.varName = varName
+        self.dotAccess = None
 
         self.start = start
         self.end = end
 
     def __repr__(self):
-        return f'VarAccess Node : [ {self.classNode} | {self.varName} ]'
-    
+        return f'VarAccess Node : [ {self.classNode} | {self.varName} | {self.dotAccess} ]'
+
     def getType(self):
         return VAC
+
+
+class DotAccess:
+    def __init__(self, parent, varName, dotAccess, structAccess, classAccess, funcAccess):
+        self.parent = parent
+        self.varName = varName
+        self.dotAccess = dotAccess
+        self.structAccess = structAccess
+        self.classAccess = classAccess
+        self.funcAccess = funcAccess
+
+    def __repr__(self):
+        if self.dotAccess:
+            return f'DotAccess Node : [ {self.parent} | {self.varName} | {self.dotAccess} ]'
+        else:
+            return f'DotAccess Node : [ {self.parent} | {self.varName} | {self.structAccess} | {self.classAccess} | {self.funcAccess} ]'
+
+    def getType(self):
+        return DOA
+
+
+class StructAccess:
+    def __init__(self, name, args):
+        self.name = name
+        self.args = args
+
+        self.start = self.name.start
+        self.end = self.args.end
+
+    def __repr__(self):
+        return f'Call-Class Node : [ {self.name} ({self.args}) ]'
+
+    def getType(self):
+        return STA
+
+
+class ClassAccess:
+    def __init__(self, name, args):
+        self.name = name
+        self.args = args
+
+        self.start = self.name.start
+        self.end = self.args.end
+
+    def __repr__(self):
+        return f'Call-Class Node : [ {self.name} ({self.args}) ]'
+    
+    def getType(self):
+        return CLA
+
+
+class FuncAccess:
+    def __init__(self, classNode, name, args):
+        self.classNode = classNode
+        self.name = name
+        self.args = args
+
+        self.start = self.name.start
+        self.end = self.args.end
+
+    def __repr__(self):
+        return f'Call-Function Node : [ {self.classNode} | {self.name} ({self.args}) ]'
+
+    def getType(self):
+        return FUA
 
 
 class List:
@@ -756,7 +825,7 @@ class BinOpNode:
 
     def __repr__(self):
         return f'Binary Op Node : [ {self.left} {self.op} {self.right} ]'
-    
+
     def getType(self):
         return BON
 
@@ -771,7 +840,7 @@ class UnaryNode:
 
     def __repr__(self):
         return f'Unary Node : [ {self.op} {self.node} ]'
-    
+
     def getType(self):
         return UNN
 
@@ -805,10 +874,9 @@ class For:
     def __repr__(self):
         return f'For Node : [ {self.functionNode} | {self.variables} | {self.variable} | {self.condition} | {self.steps} | {self.body} ]'
 
-# (Maybe)
-
 
 class SimpleFor:
+    # (Maybe)
     pass
 
 
@@ -845,7 +913,6 @@ class Struct:
 #
 # SomeClass test = SomeClass();
 # test.a = 1;
-# Allways has to have private or public keyword!!!!
 
 
 class Class:
@@ -906,31 +973,6 @@ class Function:
 
     def __repr__(self):
         return f'Function Node : [ {self.classNode} | {self.variables} | {self.constructor} | {self.public} | {self.static} | {self.protected} | {self.returnType} | {self.name} | {self.args} | {self.body} ]'
-
-
-class CallFunction:
-    def __init__(self, classNode, name, args):
-        self.classNode = classNode
-        self.name = name
-        self.args = args
-
-        self.start = self.name.start
-        self.end = self.args.end
-
-    def __repr__(self):
-        return f'Call-Function Node : [ {self.classNode} | {self.name} ({self.args}) ]'
-
-
-class CallClass:
-    def __init__(self, name, args):
-        self.name = name
-        self.args = args
-
-        self.start = self.name.start
-        self.end = self.args.end
-
-    def __repr__(self):
-        return f'Call-Class Node : [ {self.name} ({self.args}) ]'
 
 
 class Return:
@@ -1266,7 +1308,7 @@ class Parser:
                         "Expected valid metavalue.", SYNTAXERROR,
                         self.currTok.start, self.currTok.end, self.scriptName))
             self.reverse()
-            
+
             node = MetaCode(DEFINE, name, value)
         elif self.currTok.value == METIF:
             res.registerAdvance()
@@ -1294,7 +1336,7 @@ class Parser:
             node = MetaCode(METELIF, self.currTok)
         elif self.currTok.value == METENDIF:
             node = MetaCode(METENDIF, self.currTok)
-        
+
         if append:
             metacode.append(node)
         return res.success(node)
@@ -1349,7 +1391,7 @@ class Parser:
             elif isinstance(expr, Namespace):
                 expr.parentSpace = name
                 childSpaces.append(expr)
-            
+
         if not self.currTok.type == RCBRACKET:
             return res.failure(
                 Error(
@@ -1896,10 +1938,6 @@ def run(fn, text):
 #
 # - VarAccess or FuncCall
 # - Check for cunstructors
-# > File "D:\PythonProjects\SimpleC\SimpleC.py", line 927, in __init__
-#     self.returnType = returnTok.type
 # - Lists
-# - Comperation operations (!= /= ? < > >= <= & |) 
-# - Fix namespaces
-# > ParseError in <Test2.sc> (line: 6, 48):
-#       No valid expression found.
+# - Comperation operations (!= /= ? < > >= <= & |)
+# - dot access (someclass.othervar)
