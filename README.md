@@ -1,4 +1,4 @@
-################################################# SimpleC #################################################
+############### SimpleC ###############
 My little programming language project. (Not useable yet)
 
 It is just an interpretation of what a C-like programming language could look like.
