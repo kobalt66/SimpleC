@@ -1,4 +1,4 @@
-import SimpelC
+import SimpleC
 
 
 def openFile(fn):
@@ -7,7 +7,7 @@ def openFile(fn):
             script = f.read()
             return script, None
     except Exception as e:
-        return None, SimpelC.Error(e, SimpelC.PYTHON_EXCEPTION, -1, -1, fn)
+        return None, SimpleC.Error(e, SimpleC.PYTHON_EXCEPTION, -1, -1, fn)
 
 
 while True:
@@ -27,12 +27,11 @@ while True:
         script, error = openFile(fn)
         if error:
             error.throw()
-        result, error = SimpelC.run(f'<{fn}>', script)
+        result, error = SimpleC.run(f'<{fn}>', script)
     else:
-        result, error = SimpelC.run("<Test.sc>", text)
+        result, error = SimpleC.run("<Test.sc>", text)
 
-    if error:
+    if result:
+        print(result)
+    elif error:
         error.throw()
-    elif result:
-        for x in result:
-            print(x)
