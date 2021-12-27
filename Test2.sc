@@ -41,4 +41,5 @@ namespace nSpace
     }
 }
 
-// namespace nSpace { namespace otherSpace { public static class someClass { #metif MetaVar public static protected someClass SomeFunc(var a) { return; } #metendif } } private class Class { public void func() { return; } } }
+
+//namespace nSpace { namespace otherSpace { public static class someClass { const int b = 0; constructor(var a, int c) : b(a), b(c) { } public static void Func(var a, bol checked) { return null; } } } }
