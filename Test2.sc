@@ -1,3 +1,10 @@
+/*
+
+This example code is the code that can be parsed at the current development state.
+Past the code in a script and run it in the console.
+
+*/
+
 private var a = 1;
 
 #lib = "someLib"
@@ -7,10 +14,10 @@ namespace nSpace
 {
     namespace otherSpace
     {
-        public static class someClass // Check!
+        public static class someClass
         {
         #metif MetaVar
-            public static protected someClass SomeFunc(var a) { return; } // Check!
+            public static protected someClass SomeFunc(var a) { return; }
         #metendif
         }
     }
