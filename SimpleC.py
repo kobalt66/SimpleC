@@ -104,12 +104,15 @@ KEYWORDS = [
     SIZEOF,
     TYPEOF,
     LENGHTOF,
-    NULL,
-    FALSE,
-    TRUE,
     THIS,
     USING,
     NAMESPACE
+]
+
+PREDEFINED = [
+    NULL,
+    FALSE,
+    TRUE
 ]
 
 # Operations
@@ -632,10 +635,11 @@ class Import:
 # Variables of another script can only be accessed as long as they are public / not a constant / and as long
 # as the script has the other script's library imported!
 class Script:
-    def __init__(self, name, imports, lib, namespaces, global_variables, global_classes, global_structs):
+    def __init__(self, name, imports, lib, metacode, namespaces, global_variables, global_classes, global_structs):
         self.name = name
         self.imports = imports
         self.lib = lib
+        self.metacode = metacode
         self.namespaces = namespaces
         self.global_variables = global_variables
         self.global_classes = global_classes
@@ -658,15 +662,17 @@ class Lib:
 
 
 class Namespace:
-    def __init__(self, script, lib, name, classes, structs):
+    def __init__(self, script, lib, name, childSpaces, classes, structs):
         self.script = script
         self.lib = lib
         self.name = name
+        self.parentSpace = None
+        self.childSpaces = childSpaces
         self.classes = classes
         self.structs = structs
 
     def __repr__(self):
-        return f'Namespace Node : [ {self.script} | {self.lib} | {self.name} | {self.classes} | {self.structs} ]'
+        return f'Namespace Node : [ {self.script} | {self.lib} | {self.parentSpace} | {self.name} | {self.childSpaces} | {self.classes} | {self.structs} ]'
 
 
 class Using:
@@ -930,11 +936,11 @@ class CallClass:
 class Return:
     def __init__(self, functionNode, returnTok):
         self.functionNode = functionNode
-        self.returnType = returnTok.getType()
-        self.returnValue = returnTok
+        self.returnType = returnTok.getType() if returnTok else VOID
+        self.returnValue = returnTok if returnTok else VOID
 
-        self.start = returnTok.start
-        self.end = returnTok.end
+        self.start = returnTok.start if returnTok else None
+        self.end = returnTok.end if returnTok else None
 
     def __repr__(self):
         return f'Return Node : [ {self.functionNode} | {self.returnType} | {self.returnValue} ]'
@@ -1212,7 +1218,7 @@ class Parser:
                 global_variables.append(
                     Variable(lib, None, None, True, False, True, DEFINE, node.value, node.metVarValue))
 
-        return res.success(Script(self.scriptName, imports, lib, namespaces, global_variables, global_classes, global_structs))
+        return res.success(Script(self.scriptName, imports, lib, metacode, namespaces, global_variables, global_classes, global_structs))
 
     def metacode(self, append):
         res = ParseResult()
@@ -1253,13 +1259,14 @@ class Parser:
             res.registerAdvance()
             self.advance()
 
-            value = res.register(self.expr())
+            value = res.register(self.atom())
             if res.error or isinstance(value, MetaCode) or isinstance(value, Class) or isinstance(value, Function) or isinstance(value, Struct):
                 return res.failure(
                     Error(
                         "Expected valid metavalue.", SYNTAXERROR,
                         self.currTok.start, self.currTok.end, self.scriptName))
-
+            self.reverse()
+            
             node = MetaCode(DEFINE, name, value)
         elif self.currTok.value == METIF:
             res.registerAdvance()
@@ -1287,7 +1294,7 @@ class Parser:
             node = MetaCode(METELIF, self.currTok)
         elif self.currTok.value == METENDIF:
             node = MetaCode(METENDIF, self.currTok)
-
+        
         if append:
             metacode.append(node)
         return res.success(node)
@@ -1296,6 +1303,7 @@ class Parser:
         res = ParseResult()
         classes = []
         structs = []
+        childSpaces = []
 
         res.registerAdvance()
         self.advance()
@@ -1338,17 +1346,17 @@ class Parser:
             elif isinstance(expr, Struct):
                 expr.namespace = name
                 structs.append(expr)
-
-        res.registerAdvance()
-        self.advance()
-
+            elif isinstance(expr, Namespace):
+                expr.parentSpace = name
+                childSpaces.append(expr)
+            
         if not self.currTok.type == RCBRACKET:
             return res.failure(
                 Error(
                     "Expected '}'.", SYNTAXERROR,
                     self.currTok.start, self.currTok.end, self.scriptName))
 
-        return res.success(Namespace(self.scriptName, None, name, classes, structs))
+        return res.success(Namespace(self.scriptName, None, name, childSpaces, classes, structs))
 
     def ClassOrVarOrFunc(self):
         res = ParseResult()
@@ -1644,7 +1652,9 @@ class Parser:
             res.registerAdvance()
             self.advance()
 
-            returnTok = res.register(self.expr())
+            returnTok = res.tryRegister(self.expr())
+            if not returnTok:
+                self.reverse(res.reverseCount)
             if res.error:
                 return res
 
@@ -1759,7 +1769,7 @@ class Parser:
             res.registerAdvance()
             self.advance()
             return res.success(Type(tok.type, tok))
-        elif tok.type == IDENTIFIER:
+        elif tok.type == IDENTIFIER or tok.value in PREDEFINED:
             res.registerAdvance()
             self.advance()
             return res.success(VarAccess(None, tok, tok.start, tok.end))
@@ -1813,13 +1823,7 @@ class Parser:
     def expr(self):
         res = ParseResult()
 
-        if self.currTok.type == KEYWORD:
-            node = res.register(self.ClassOrVarOrFunc())
-            if res.error:
-                return res
-
-            return res.success(node)
-        elif self.currTok.value == NAMESPACE:
+        if self.currTok.value == NAMESPACE:
             node = res.register(self.namespace())
             if res.error:
                 return res
@@ -1827,6 +1831,12 @@ class Parser:
             return res.success(node)
         elif self.currTok.value == STRUCT:
             pass
+        elif self.currTok.type == KEYWORD:
+            node = res.register(self.ClassOrVarOrFunc())
+            if res.error:
+                return res
+
+            return res.success(node)
         elif self.currTok.type == METAKEYWORD:
             metaNode = res.register(self.metacode(True))
             if res.error:
