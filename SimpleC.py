@@ -898,7 +898,6 @@ class While:
         return f'While Node : [ {self.functionNode} | {self.variables} | {self.condition} | {self.body} ]'
 
 
-# A struct has to have at least ONE constrctor!
 class Struct:
     def __init__(self, script, lib, namespace, externNameSpaces, variables, name, constructors):
         self.script = script
@@ -1437,7 +1436,7 @@ class Parser:
                 res.registerAdvance()
                 self.advance()
 
-        if self.currTok.type == KEYWORD or self.currTok.type == IDENTIFIER:
+        if self.currTok.type == KEYWORD:
             if self.currTok.value == CLASS:
                 node = res.register(self._class())
                 if res.error:
@@ -1446,7 +1445,7 @@ class Parser:
                 node.public = public
                 node.static = static
                 return res.success(node)
-            elif self.currTok.value in funcTypes or self.currTok.type == IDENTIFIER:
+            elif self.currTok.value in funcTypes:
                 node = res.register(self.function())
                 if res.error:
                     return res
@@ -1465,7 +1464,9 @@ class Parser:
             node.static = static
             node.const = const
             return res.success(node)
-
+        elif self.currTok.type == IDENTIFIER:
+            pass # varaccess, dotaccess, ...
+        
         return res.failure(
             Error(
                 "Expected valid class, variable or function...", PARSEERROR,
