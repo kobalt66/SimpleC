@@ -16,13 +16,22 @@ namespace nSpace
     {
         public static class someClass
         {
+            const int b = 0;
+            constructor(var a, int c)
+            : b(a), b(c)
+            {
+            }
         #metif MetaVar
             public static protected someClass SomeFunc(var a) { return; }
         #metendif
         }
     }
-    private class Class
+    struct TestStruct
     {
-        public void func() { return; }
+        const int b = 0; 
+        constructor(var a, int c)
+            : b(a), b(c)
+        {
+        }
     }
 }
