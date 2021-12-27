@@ -26,12 +26,15 @@ namespace nSpace
         #metendif
         }
     }
-    struct TestStruct
+    namespace otherSpace2
     {
-        const int b = 0; 
-        constructor(var a, int c)
-            : b(a), b(c)
+        struct TestStruct
         {
+            const int b = 0; 
+            constructor(var a, int c)
+                : b(a), b(c)
+            {
+            }
         }
     }
 }
