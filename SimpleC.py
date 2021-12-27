@@ -2208,8 +2208,8 @@ def run(fn, text):
 
 # TODOs :
 #
-# - VarAccess, DotAccess, ...
+# - VarAccess, DotAccess, ... (someclass.othervar)
 # - Lists
 # - if, for, while, do...while
 # - Comperation operations (!= ? < > >= <= & |)
-# - dot access (someclass.othervar)
+# - override
