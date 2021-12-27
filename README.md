@@ -1,4 +1,4 @@
-############### SimpleC ###############
+# SimpleC
 
 My little programming language project. (Not useable yet)
 
