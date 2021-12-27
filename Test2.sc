@@ -1,6 +1,3 @@
-// private var a = 1;                   Check!
-// public var b = (1 - (-1)) * 2^4;     Check!
-
 #lib = "someLib"
 #define MetaVar 1
 
@@ -8,7 +5,7 @@ namespace nSpace
 {
     public static class someClass // Check!
     {
-        /*using someLib;  // Check!
+        using someLib;  // Check!
         private var a = 12; // Check!
         private static void SomeFunction() // Check!
         {
@@ -26,14 +23,14 @@ namespace nSpace
             chr c = 'c';
 
             return a + b / i * f - -(d ^ s) + c;
-        }*/
+        }
+        
     #metif MetaVar
         public static protected someClass SomeFunc(var a) { return (12 * 12^24) / -(1 - 1); } // Check!
     #metendif
     }
 }
 
-/*
 public class Class2
 {
     using someLib;
@@ -46,4 +43,3 @@ public class Class2
         var b = (1 - (-1)) * 2^4;
     }
 }
-*/
