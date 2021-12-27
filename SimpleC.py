@@ -2211,5 +2211,5 @@ def run(fn, text):
 # - VarAccess, DotAccess, ...
 # - Lists
 # - if, for, while, do...while
-# - Comperation operations (!= /= ? < > >= <= & |)
+# - Comperation operations (!= ? < > >= <= & |)
 # - dot access (someclass.othervar)
