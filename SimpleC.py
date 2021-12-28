@@ -2023,9 +2023,6 @@ class Parser:
         self.advance()
 
         if not self.currTok.type == EQUALS:
-            res.registerAdvance()
-            self.advance()
-
             if not self.currTok.type == ENDCOLUMN:
                 return res.failure(
                     Error(
@@ -2161,7 +2158,12 @@ class Parser:
                 return res
 
             return res.success(metaNode)
-
+        elif self.currTok.type == VARTYPE:
+            node = res.register(self.defVar())
+            if res.error:
+                return res
+            return res.success(node)
+        
         node = res.register(self.bin_op(self.term, (PLUS, MINUS)))
 
         if res.error:
