@@ -647,7 +647,7 @@ class Import:
         self.lib = lib
 
     def __repr__(self):
-        return f'Import Node : \n\t\t{self.lib} '
+        return f'Import Node : \n\t\tLibrary Name > {self.lib} '
 
 # Variables of another script can only be accessed as long as they are public / not a constant / and as long
 # as the script has the other script's library imported!
@@ -665,7 +665,7 @@ class Script:
         self.global_structs = global_structs
 
     def __repr__(self):
-        return f'\nScript Node : \n\t[\n\n\t\t{self.name}\n\t\t{self.imports}\n\t\t{self.lib}\n\t\t{self.namespaces}\n\t\t{self.global_variables}\n\t\t{self.global_classes}\n\t\t{self.global_structs}\n\n\t]'
+        return f'\nScript Node : \n\t[\n\n\t\tScript name > {self.name}\n\t\tImports > {self.imports}\n\t\tLibrary name > {self.lib}\n\t\tNamespaces > {self.namespaces}\n\t\tGlobal variables > {self.global_variables}\n\t\tGlobal classes > {self.global_classes}\n\t\tGlobal structs > {self.global_structs}\n\n\t]'
 
 
 class Lib:
@@ -674,7 +674,7 @@ class Lib:
         self.name = name
 
     def __repr__(self):
-        return f'Lib Node : \n[\n\n\t\t{self.name}\n\t\t{self.scripts}\n\n]'
+        return f'Lib Node : \n[\n\n\t\tLibrary\'s name > {self.name}\n\t\tSpripts > {self.scripts}\n\n]'
 
 
 class Namespace:
@@ -688,7 +688,7 @@ class Namespace:
         self.structs = structs
 
     def __repr__(self):
-        return f'\n\tNamespace Node : \n\t\t{self.script}\n\t\t{self.lib}\n\t\t{self.parentSpace}\n\t\t{self.name}\n\t\t{self.childSpaces}\n\t\t{self.classes}\n\t\t{self.structs}'
+        return f'\n\tNamespace Node : \n\t\tScript > {self.script}\n\t\tLibrary > {self.lib}\n\t\tParent namespace > {self.parentSpace}\n\t\tName > {self.name}\n\t\tChild namespaces > {self.childSpaces}\n\t\tClasses > {self.classes}\n\t\tStructs > {self.structs}'
 
 
 class Using:
@@ -696,7 +696,7 @@ class Using:
         self.name = name
 
     def __repr__(self):
-        return f'\n\tUsing Node : \n\t\t{self.name}'
+        return f'\n\tUsing Node : \n\t\tNamespace > {self.name}'
 
 
 class Variable:
@@ -724,7 +724,7 @@ class Variable:
     def __repr__(self):
         condition = 'static' if self.static else ''
         condition = 'const' if self.const else condition
-        return f'\n\tVariable Node : \n\t\t{self.lib}\n\t\t{self.namespace}\n\t\t{self.classNode}\n\t\t{self.public}\n\t\t{condition}\n\t\t{self.type}\n\t\t{self.name}\n\t\t{self.value}'
+        return f'\n\tVariable Node : \n\t\tLibrary > {self.lib}\n\t\tNamespace > {self.namespace}\n\t\tClass > {self.classNode}\n\t\tPublic > {self.public}\n\t\tStatic/Const > {condition}\n\t\tType > {self.type}\n\t\tName > {self.name}\n\t\tValue > {self.value}'
 
 
 class VarAccess:
@@ -737,7 +737,7 @@ class VarAccess:
         self.end = end
 
     def __repr__(self):
-        return f'\n\tVarAccess Node : \n\t\t{self.classNode}\n\t\t{self.varName}\n\t\t{self.dotAccess}'
+        return f'\n\tVarAccess Node : \n\t\tClass > {self.classNode}\n\t\tVariable name > {self.varName}\n\t\tDot-access > {self.dotAccess}'
 
     def getType(self):
         return VAC
@@ -754,9 +754,9 @@ class DotAccess:
 
     def __repr__(self):
         if self.dotAccess:
-            return f'\n\tDotAccess Node : \n\t\t{self.parent}\n\t\t{self.varName}\n\t\t{self.dotAccess}'
+            return f'\n\tDotAccess Node : \n\t\tParent > {self.parent}\n\t\tVariable name > {self.varName}\n\t\tDot-access > {self.dotAccess}'
         else:
-            return f'\n\tDotAccess Node : \n\t\t{self.parent}\n\t\t{self.varName}\n\t\t{self.structAccess}\n\t\t{self.classAccess}\n\t\t{self.funcAccess}'
+            return f'\n\tDotAccess Node : \n\t\tParent > {self.parent}\n\t\tVariable name > {self.varName}\n\t\tStruct-access > {self.structAccess}\n\t\tClass-access > {self.classAccess}\n\t\tFunction-access > {self.funcAccess}'
 
     def getType(self):
         return DOA
@@ -771,7 +771,7 @@ class StructAccess:
         self.end = self.args.end
 
     def __repr__(self):
-        return f'\n\tCall-Class Node : \n\t\t{self.name} ({self.args})'
+        return f'\n\tCall-Class Node : \n\t\tStruct name > {self.name} Parameters > ({self.args})'
 
     def getType(self):
         return STA
@@ -786,15 +786,14 @@ class ClassAccess:
         self.end = self.args.end
 
     def __repr__(self):
-        return f'\n\tCall-Class Node : \n\t\t{self.name} ({self.args})'
+        return f'\n\tCall-Class Node : \n\t\Class name > {self.name} Parameters > ({self.args})'
 
     def getType(self):
         return CLA
 
 
 class FuncAccess:
-    def __init__(self, classNode, name, args):
-        self.classNode = classNode
+    def __init__(self, name, args):
         self.name = name
         self.args = args
 
@@ -802,7 +801,7 @@ class FuncAccess:
         self.end = self.args.end
 
     def __repr__(self):
-        return f'\n\tCall-Function Node : \n\t\t{self.classNode}\n\t\t{self.name} ({self.args})'
+        return f'\n\tCall-Function Node : \n\t\tFunction name > {self.name} Parameters >  ({self.args})'
 
     def getType(self):
         return FUA
@@ -824,7 +823,7 @@ class List:
     def __repr__(self):
         condition = 'static' if self.static != None else ''
         condition = 'const' if self.const != None else condition
-        return f'\n\tList Node : \n\t\t{self.classNode}\n\t\t{self.public}\n\t\t{condition}\n\t\t{self.type}\n\t\t{self.name}\n\t\t{self.elements}'
+        return f'\n\tList Node : \n\t\tClass > {self.classNode}\n\t\tPublic > {self.public}\n\t\tStatic/Const > {condition}\n\t\tType > {self.type}\n\t\tName > {self.name}\n\t\tElements > {self.elements}'
 
     def getType(self):
         return self.type
@@ -840,7 +839,7 @@ class BinOpNode:
         self.end = self.right.end
 
     def __repr__(self):
-        return f'\n\tBinary Op Node : \n\t\t{self.left}\n\t\t{self.op}\n\t\t{self.right}'
+        return f'\n\tBinary Op Node : \n\t\tLeft node > {self.left}\n\t\tOperator > {self.op}\n\t\tRight node > {self.right}'
 
     def getType(self):
         return BON
@@ -855,7 +854,7 @@ class UnaryNode:
         self.end = self.node.end
 
     def __repr__(self):
-        return f'\n\tUnary Node : \n\t\t{self.op}\n\t\t{self.node}'
+        return f'\n\tUnary Node : \n\t\tOperator > {self.op}\n\t\tNode > {self.node}'
 
     def getType(self):
         return UNN
@@ -872,7 +871,7 @@ class If:
         self.end = self.elseCase.end if self.elseCase else self.cases.end
 
     def __repr__(self):
-        return f'\n\tIf Node : \n\t\t{self.functionNode}\n\t\t{self.variables}\n\t\t{self.cases}\n\t\t{self.elseCase}'
+        return f'\n\tIf Node : \n\t\tFunction name > {self.functionNode}\n\t\tVariables > {self.variables}\n\t\tCases > {self.cases}\n\t\tElse case > {self.elseCase}'
 
 
 class For:
@@ -888,7 +887,7 @@ class For:
         self.end = self.body.end
 
     def __repr__(self):
-        return f'\n\tFor Node : \n\t\t{self.functionNode}\n\t\t{self.variables}\n\t\t{self.variable}\n\t\t{self.condition}\n\t\t{self.steps}\n\t\t{self.body}'
+        return f'\n\tFor Node : \n\t\tFunction name > {self.functionNode}\n\t\tVariables > {self.variables}\n\t\tStep variable > {self.variable}\n\t\tCondition > {self.condition}\n\t\tStep count > {self.steps}\n\t\tBody > {self.body}'
 
 
 class SimpleFor:
@@ -907,7 +906,7 @@ class While:
         self.end = self.body.end
 
     def __repr__(self):
-        return f'\n\tWhile Node : \n\t\t{self.functionNode}\n\t\t{self.variables}\n\t\t{self.condition}\n\t\t{self.body}'
+        return f'\n\tWhile Node : \n\t\tFunction name > {self.functionNode}\n\t\tVariables > {self.variables}\n\t\tCondition > {self.condition}\n\t\tBody > {self.body}'
 
 
 class Struct:
@@ -924,7 +923,7 @@ class Struct:
         self.end = self.constructors[0].end
 
     def __repr__(self):
-        return f'\n\tStruct Node : \n\t\t{self.script}\n\t\t{self.lib}\n\t\t{self.namespace}\n\t\t{self.externNameSpaces}\n\t\t{self.variables}\n\t\t{self.name}\n\t\t{self.constructors}'
+        return f'\n\tStruct Node : \n\t\tScript name > {self.script}\n\t\tLibrary name > {self.lib}\n\t\tNamespace name > {self.namespace}\n\t\tUsing namespaces > {self.externNameSpaces}\n\t\tVariables > {self.variables}\n\t\tName > {self.name}\n\t\tConstructors > {self.constructors}'
 
 # Doesn't have to have a cunstructor. Variables can be changeg by accessing the Class like this:
 #
@@ -949,7 +948,7 @@ class Class:
         self.end = self.name.end
 
     def __repr__(self):
-        return f'\n\tClass Node : \n\t\t{self.script}\n\t\t{self.lib}\n\t\t{self.namespace}\n\t\t{self.externNameSpaces}\n\t\t{self.variables}\n\t\t{self.public}\n\t\t{self.static}\n\t\t{self.name}\n\t\t{self.constructors}\n\t\t{self.body}'
+        return f'\n\tClass Node : \n\t\tScript name > {self.script}\n\t\tLibrary name > {self.lib}\n\t\tNamespace name > {self.namespace}\n\t\tUsing namespaces > {self.externNameSpaces}\n\t\tVariables > {self.variables}\n\t\tPublic > {self.public}\n\t\tStatic > {self.static}\n\t\tName > {self.name}\n\t\tConstructors > {self.constructors}\n\t\tBody > {self.body}'
 
 # It can only have the returntype and arguments of the original function.
 # The overriden function will only be overriden for the script the override function is being called
@@ -969,7 +968,7 @@ class Override:
         self.end = self.body.end
 
     def __repr__(self):
-        return f'\n\Override Node : \n\t\t{self.classNode}\n\t\t{self.functionNode}\n\t\t{self.variables}\n\t\t{self.returnType}\n\t\t{self.name}\n\t\t{self.args}\n\t\t{self.body}'
+        return f'\n\Override Node : \n\t\tClass name > {self.classNode}\n\t\tFunction to override > {self.functionNode}\n\t\tVariables > {self.variables}\n\t\tReturn type > {self.returnType}\n\t\tName > {self.name}\n\t\tParameters > {self.args}\n\t\tBody > {self.body}'
 
 
 class Function:
@@ -992,7 +991,7 @@ class Function:
         self.end = None
 
     def __repr__(self):
-        return f'\n\tFunction Node : \n\t\t{self.classNode}\n\t\t{self.variables}\n\t\t{self.constructor}\n\t\t{self.public}\n\t\t{self.static}\n\t\t{self.protected}\n\t\t{self.returnType}\n\t\t{self.name}\n\t\t{self.args}\n\t\t{self.body}'
+        return f'\n\tFunction Node : \n\t\tClass name > {self.classNode}\n\t\tVariables > {self.variables}\n\t\tIs constructor? > {self.constructor}\n\t\tPublic > {self.public}\n\t\tStatic > {self.static}\n\t\tProtected > {self.protected}\n\t\tReturn type > {self.returnType}\n\t\tName > {self.name}\n\t\tParameters > {self.args}\n\t\tBody > {self.body}'
 
 
 class Return:
@@ -1005,29 +1004,25 @@ class Return:
         self.end = returnTok.end if returnTok else None
 
     def __repr__(self):
-        return f'\n\tReturn Node : \n\t\t{self.functionNode}\n\t\t{self.returnType}\n\t\t{self.returnValue}'
+        return f'\n\tReturn Node : \n\t\tFunction name > {self.functionNode}\n\t\tReturn type > {self.returnType}\n\t\tReturn value > {self.returnValue}'
 
 
 class Continue:
-    def __init__(self, loopNode, start, end):
-        self.loopNode = loopNode
-
+    def __init__(self, start, end):
         self.start = start
         self.end = end
 
     def __repr__(self):
-        return f'\n\tContinue Node : \n\t\t{self.loopNode}'
+        return f'\n\t<Continue Node>'
 
 
 class Break:
-    def __init__(self, loopNode, start, end):
-        self.loopNode = loopNode
-
+    def __init__(self, start, end):
         self.start = start
         self.end = end
 
     def __repr__(self):
-        return f'\n\tBreak Node : \n\t\t{self.loopNode}'
+        return f'\n\t<Break Node>'
 
 
 class MetaCode:
@@ -1040,7 +1035,7 @@ class MetaCode:
         self.end = identifier.end
 
     def __repr__(self):
-        return f'\nMetaCode Node : \n\t{self.type} : {self.value}'
+        return f'\nMetaCode Node : \n\tType > {self.type} : Value > {self.value}'
 
 # Variable nodes
 
@@ -1054,7 +1049,7 @@ class Number:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'\n\tNumber Node : \n\t\t{self.type} : {self.value}'
+        return f'\n\tNumber Node : \n\t\tType > {self.type} : Value > {self.value}'
 
     def getType(self):
         return self.type
@@ -1069,7 +1064,7 @@ class String:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'\n\tString Node: \n\t\t{self.type} : {self.value}'
+        return f'\n\tString Node: \n\t\tType > {self.type} : Value > {self.value}'
 
     def getType(self):
         return self.type
@@ -1084,7 +1079,7 @@ class Bool:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'\n\tBool Node: \n\t\t{self.type} : {self.value}'
+        return f'\n\tBool Node: \n\t\tType > {self.type} : Value > {self.value}'
 
     def getType(self):
         return self.type
@@ -1099,7 +1094,7 @@ class Type:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'\n\tType Node: \n\t\t{self.type} : {self.value}'
+        return f'\n\tType Node: \n\t\tType > {self.type} : Value > {self.value}'
 
     def getType(self):
         return self.type
@@ -1114,7 +1109,7 @@ class Var:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'\n\tVar Node: \n\t\t{self.type} : {self.value}'
+        return f'\n\tVar Node: \n\t\tType > {self.type} : Value > {self.value}'
 
     def getType(self):
         return self.type
@@ -1129,7 +1124,7 @@ class Byte:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'\n\tByte Node: \n\t\t{self.type} : {self.value}'
+        return f'\n\tByte Node: \n\t\tType > {self.type} : Value > {self.value}'
 
     def getType(self):
         return self.type
@@ -1200,7 +1195,6 @@ class Parser:
     def advance(self):
         self.idx += 1
         self.updateTok()
-        print(f'{self.currTok.type} : {self.currTok.value}')
         return self.currTok
 
     def parse(self):
