@@ -17,10 +17,13 @@ It is open source: Use it, if you want, or make it better.
 
 # How does it work?
 
-1. Copy the main.py and SimpleC.py file into a new vs code project.
+1. Copy the Test.sc, main.py and SimpleC.py file into a new vs code project.
 2. Open a new terminal and run main.py with 'python3 .\main.py'
 3. A custom console for SimpleC will show up '[@] >'
 4. If you want to run Test.sc type 'run§'
 5. A new console element will appear '[FileName]'
 6. Type 'Test.sc' into the console and press enter.
 7. If the syntax is correct a long list of the parse result will be loaded into the console!
+
+You can create a new SimpleC script inside the project.
+(In step 6) To run those scripts you simply have to type in the file name of the script.
