@@ -1,5 +1,5 @@
 ##############################################################################################
-# This is the compiler for SimpleC | development start: 18.12.2021 | release date: ?         #
+# This is the compiler for SimpleC\n\t\tdevelopment start: 18.12.2021\n\t\trelease date: ?   #
 ##############################################################################################
 #                                                                                            #
 # - SimpleC is mixture of many C-like programming languages                                  #
@@ -191,6 +191,18 @@ DOA = 'dotaccess'
 STA = 'structaccess'
 CLA = 'classaccess'
 FUA = 'funcaccess'
+FUNCTYPES = [
+    VOID,
+    VAR,
+    BYT,
+    CHR,
+    STR,
+    INT,
+    FLT,
+    DBL,
+    BOL,
+    TYP
+]
 
 
 # Error types
@@ -250,8 +262,8 @@ class Token:
 
     def __repr__(self):
         if self.value:
-            return f'[ {self.type}:{self.value} ]'
-        return f'[ {self.type} ]'
+            return f'\n\t{self.type}:{self.value}'
+        return f'\n\t{self.type}'
 
 
 class Error:
@@ -264,7 +276,7 @@ class Error:
 
     def throw(self):
         print(
-            f'{self.errorType} in {self.fileName} (line: {self.line}, {self.column}):\n\t{self.message}')
+            f'{self.errorType} in {self.fileName} (line: {self.line}, {self.column}):\n\t\t{self.message}')
 
 
 ##################
@@ -340,7 +352,7 @@ class Lexer:
             elif self.currChar == LSBRACKET:            # [
                 tokens.append(Token(LSBRACKET, start=self.pos))
                 self.advance()
-            elif self.currChar == RSBRACKET:            # ]
+            elif self.currChar == RSBRACKET:            #
                 tokens.append(Token(RSBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == LBRACKET:             # (
@@ -627,7 +639,7 @@ class MasterScript:
         self.libs = libs
 
     def __repr__(self):
-        return f'MASTERSCRIPT [ {self.libs} ]'
+        return f'MASTERSCRIPT : {self.libs}'
 
 
 class Import:
@@ -635,7 +647,7 @@ class Import:
         self.lib = lib
 
     def __repr__(self):
-        return f'Import Node : [ {self.lib} ]'
+        return f'Import Node : \n\t\t{self.lib} '
 
 # Variables of another script can only be accessed as long as they are public / not a constant / and as long
 # as the script has the other script's library imported!
@@ -653,7 +665,7 @@ class Script:
         self.global_structs = global_structs
 
     def __repr__(self):
-        return f'Script Node : [ {self.name} | {self.imports} | {self.lib} | {self.namespaces} | {self.global_variables} | {self.global_classes} | {self.global_structs} ]'
+        return f'\nScript Node : \n\t[\n\n\t\t{self.name}\n\t\t{self.imports}\n\t\t{self.lib}\n\t\t{self.namespaces}\n\t\t{self.global_variables}\n\t\t{self.global_classes}\n\t\t{self.global_structs}\n\n\t]'
 
 
 class Lib:
@@ -662,7 +674,7 @@ class Lib:
         self.name = name
 
     def __repr__(self):
-        return f'Lib Node : [ {self.name} | {self.scripts} ]'
+        return f'Lib Node : \n[\n\n\t\t{self.name}\n\t\t{self.scripts}\n\n]'
 
 
 class Namespace:
@@ -676,7 +688,7 @@ class Namespace:
         self.structs = structs
 
     def __repr__(self):
-        return f'Namespace Node : [ {self.script} | {self.lib} | {self.parentSpace} | {self.name} | {self.childSpaces} | {self.classes} | {self.structs} ]'
+        return f'\n\tNamespace Node : \n\t\t{self.script}\n\t\t{self.lib}\n\t\t{self.parentSpace}\n\t\t{self.name}\n\t\t{self.childSpaces}\n\t\t{self.classes}\n\t\t{self.structs}'
 
 
 class Using:
@@ -684,7 +696,7 @@ class Using:
         self.name = name
 
     def __repr__(self):
-        return f'Using Node : [ {self.name} ]'
+        return f'\n\tUsing Node : \n\t\t{self.name}'
 
 
 class Variable:
@@ -712,7 +724,7 @@ class Variable:
     def __repr__(self):
         condition = 'static' if self.static else ''
         condition = 'const' if self.const else condition
-        return f'Variable Node : [ {self.lib} | {self.namespace} | {self.classNode} | {self.public} | {condition} | {self.type} | {self.name} | {self.value} ]'
+        return f'\n\tVariable Node : \n\t\t{self.lib}\n\t\t{self.namespace}\n\t\t{self.classNode}\n\t\t{self.public}\n\t\t{condition}\n\t\t{self.type}\n\t\t{self.name}\n\t\t{self.value}'
 
 
 class VarAccess:
@@ -725,7 +737,7 @@ class VarAccess:
         self.end = end
 
     def __repr__(self):
-        return f'VarAccess Node : [ {self.classNode} | {self.varName} | {self.dotAccess} ]'
+        return f'\n\tVarAccess Node : \n\t\t{self.classNode}\n\t\t{self.varName}\n\t\t{self.dotAccess}'
 
     def getType(self):
         return VAC
@@ -742,9 +754,9 @@ class DotAccess:
 
     def __repr__(self):
         if self.dotAccess:
-            return f'DotAccess Node : [ {self.parent} | {self.varName} | {self.dotAccess} ]'
+            return f'\n\tDotAccess Node : \n\t\t{self.parent}\n\t\t{self.varName}\n\t\t{self.dotAccess}'
         else:
-            return f'DotAccess Node : [ {self.parent} | {self.varName} | {self.structAccess} | {self.classAccess} | {self.funcAccess} ]'
+            return f'\n\tDotAccess Node : \n\t\t{self.parent}\n\t\t{self.varName}\n\t\t{self.structAccess}\n\t\t{self.classAccess}\n\t\t{self.funcAccess}'
 
     def getType(self):
         return DOA
@@ -759,7 +771,7 @@ class StructAccess:
         self.end = self.args.end
 
     def __repr__(self):
-        return f'Call-Class Node : [ {self.name} ({self.args}) ]'
+        return f'\n\tCall-Class Node : \n\t\t{self.name} ({self.args})'
 
     def getType(self):
         return STA
@@ -774,7 +786,7 @@ class ClassAccess:
         self.end = self.args.end
 
     def __repr__(self):
-        return f'Call-Class Node : [ {self.name} ({self.args}) ]'
+        return f'\n\tCall-Class Node : \n\t\t{self.name} ({self.args})'
 
     def getType(self):
         return CLA
@@ -790,7 +802,7 @@ class FuncAccess:
         self.end = self.args.end
 
     def __repr__(self):
-        return f'Call-Function Node : [ {self.classNode} | {self.name} ({self.args}) ]'
+        return f'\n\tCall-Function Node : \n\t\t{self.classNode}\n\t\t{self.name} ({self.args})'
 
     def getType(self):
         return FUA
@@ -812,7 +824,7 @@ class List:
     def __repr__(self):
         condition = 'static' if self.static != None else ''
         condition = 'const' if self.const != None else condition
-        return f'List Node : [ {self.classNode} | {self.public} | {condition} | {self.type} | {self.name} | {self.elements} ]'
+        return f'\n\tList Node : \n\t\t{self.classNode}\n\t\t{self.public}\n\t\t{condition}\n\t\t{self.type}\n\t\t{self.name}\n\t\t{self.elements}'
 
     def getType(self):
         return self.type
@@ -828,7 +840,7 @@ class BinOpNode:
         self.end = self.right.end
 
     def __repr__(self):
-        return f'Binary Op Node : [ {self.left} {self.op} {self.right} ]'
+        return f'\n\tBinary Op Node : \n\t\t{self.left}\n\t\t{self.op}\n\t\t{self.right}'
 
     def getType(self):
         return BON
@@ -843,7 +855,7 @@ class UnaryNode:
         self.end = self.node.end
 
     def __repr__(self):
-        return f'Unary Node : [ {self.op} {self.node} ]'
+        return f'\n\tUnary Node : \n\t\t{self.op}\n\t\t{self.node}'
 
     def getType(self):
         return UNN
@@ -860,7 +872,7 @@ class If:
         self.end = self.elseCase.end if self.elseCase else self.cases.end
 
     def __repr__(self):
-        return f'If Node : [ {self.functionNode} | {self.variables} | {self.cases} | {self.elseCase} ]'
+        return f'\n\tIf Node : \n\t\t{self.functionNode}\n\t\t{self.variables}\n\t\t{self.cases}\n\t\t{self.elseCase}'
 
 
 class For:
@@ -876,7 +888,7 @@ class For:
         self.end = self.body.end
 
     def __repr__(self):
-        return f'For Node : [ {self.functionNode} | {self.variables} | {self.variable} | {self.condition} | {self.steps} | {self.body} ]'
+        return f'\n\tFor Node : \n\t\t{self.functionNode}\n\t\t{self.variables}\n\t\t{self.variable}\n\t\t{self.condition}\n\t\t{self.steps}\n\t\t{self.body}'
 
 
 class SimpleFor:
@@ -895,7 +907,7 @@ class While:
         self.end = self.body.end
 
     def __repr__(self):
-        return f'While Node : [ {self.functionNode} | {self.variables} | {self.condition} | {self.body} ]'
+        return f'\n\tWhile Node : \n\t\t{self.functionNode}\n\t\t{self.variables}\n\t\t{self.condition}\n\t\t{self.body}'
 
 
 class Struct:
@@ -912,7 +924,7 @@ class Struct:
         self.end = self.constructors[0].end
 
     def __repr__(self):
-        return f'Struct Node : [ {self.script} | {self.lib} | {self.namespace} | {self.externNameSpaces} | {self.variables} | {self.name} | {self.constructors} ]'
+        return f'\n\tStruct Node : \n\t\t{self.script}\n\t\t{self.lib}\n\t\t{self.namespace}\n\t\t{self.externNameSpaces}\n\t\t{self.variables}\n\t\t{self.name}\n\t\t{self.constructors}'
 
 # Doesn't have to have a cunstructor. Variables can be changeg by accessing the Class like this:
 #
@@ -937,7 +949,7 @@ class Class:
         self.end = self.name.end
 
     def __repr__(self):
-        return f'Class Node : [ {self.script} | {self.lib} | {self.namespace} | {self.externNameSpaces} | {self.variables} | {self.public} | {self.static} | {self.name} | {self.constructors} | {self.body} ]'
+        return f'\n\tClass Node : \n\t\t{self.script}\n\t\t{self.lib}\n\t\t{self.namespace}\n\t\t{self.externNameSpaces}\n\t\t{self.variables}\n\t\t{self.public}\n\t\t{self.static}\n\t\t{self.name}\n\t\t{self.constructors}\n\t\t{self.body}'
 
 # It can only have the returntype and arguments of the original function.
 # The overriden function will only be overriden for the script the override function is being called
@@ -957,7 +969,7 @@ class Override:
         self.end = self.body.end
 
     def __repr__(self):
-        return f'Function Node : [ {self.classNode} | {self.functionNode} | {self.variables} | {self.returnType} | {self.name} | {self.args} | {self.body} ]'
+        return f'\n\Override Node : \n\t\t{self.classNode}\n\t\t{self.functionNode}\n\t\t{self.variables}\n\t\t{self.returnType}\n\t\t{self.name}\n\t\t{self.args}\n\t\t{self.body}'
 
 
 class Function:
@@ -980,7 +992,7 @@ class Function:
         self.end = None
 
     def __repr__(self):
-        return f'Function Node : [ {self.classNode} | {self.variables} | {self.constructor} | {self.public} | {self.static} | {self.protected} | {self.returnType} | {self.name} | {self.args} | {self.body} ]'
+        return f'\n\tFunction Node : \n\t\t{self.classNode}\n\t\t{self.variables}\n\t\t{self.constructor}\n\t\t{self.public}\n\t\t{self.static}\n\t\t{self.protected}\n\t\t{self.returnType}\n\t\t{self.name}\n\t\t{self.args}\n\t\t{self.body}'
 
 
 class Return:
@@ -993,7 +1005,7 @@ class Return:
         self.end = returnTok.end if returnTok else None
 
     def __repr__(self):
-        return f'Return Node : [ {self.functionNode} | {self.returnType} | {self.returnValue} ]'
+        return f'\n\tReturn Node : \n\t\t{self.functionNode}\n\t\t{self.returnType}\n\t\t{self.returnValue}'
 
 
 class Continue:
@@ -1004,7 +1016,7 @@ class Continue:
         self.end = end
 
     def __repr__(self):
-        return f'Continue Node : [ {self.loopNode} ]'
+        return f'\n\tContinue Node : \n\t\t{self.loopNode}'
 
 
 class Break:
@@ -1015,7 +1027,7 @@ class Break:
         self.end = end
 
     def __repr__(self):
-        return f'Break Node : [ {self.loopNode} ]'
+        return f'\n\tBreak Node : \n\t\t{self.loopNode}'
 
 
 class MetaCode:
@@ -1028,7 +1040,7 @@ class MetaCode:
         self.end = identifier.end
 
     def __repr__(self):
-        return f'MetaCode Node : [ {self.type} : {self.value} ]'
+        return f'\nMetaCode Node : \n\t{self.type} : {self.value}'
 
 # Variable nodes
 
@@ -1042,7 +1054,7 @@ class Number:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'Number Node : [ {self.type} : {self.value} ]'
+        return f'\n\tNumber Node : \n\t\t{self.type} : {self.value}'
 
     def getType(self):
         return self.type
@@ -1057,7 +1069,7 @@ class String:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'String Node: [ {self.type} : {self.value} ]'
+        return f'\n\tString Node: \n\t\t{self.type} : {self.value}'
 
     def getType(self):
         return self.type
@@ -1072,7 +1084,7 @@ class Bool:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'Bool Node: [ {self.type} : {self.value} ]'
+        return f'\n\tBool Node: \n\t\t{self.type} : {self.value}'
 
     def getType(self):
         return self.type
@@ -1087,7 +1099,7 @@ class Type:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'Type Node: [ {self.type} : {self.value} ]'
+        return f'\n\tType Node: \n\t\t{self.type} : {self.value}'
 
     def getType(self):
         return self.type
@@ -1102,7 +1114,7 @@ class Var:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'Var Node: [ {self.type} : {self.value} ]'
+        return f'\n\tVar Node: \n\t\t{self.type} : {self.value}'
 
     def getType(self):
         return self.type
@@ -1117,7 +1129,7 @@ class Byte:
         self.end = self.value.end
 
     def __repr__(self):
-        return f'Byte Node: [ {self.type} : {self.value} ]'
+        return f'\n\tByte Node: \n\t\t{self.type} : {self.value}'
 
     def getType(self):
         return self.type
@@ -1165,8 +1177,8 @@ class ParseResult:
 ##################
 
 
-masterscript = MasterScript([])
-metacode = []
+masterscript = None
+metacode = None
 
 
 class Parser:
@@ -1188,6 +1200,7 @@ class Parser:
     def advance(self):
         self.idx += 1
         self.updateTok()
+        print(f'{self.currTok.type} : {self.currTok.value}')
         return self.currTok
 
     def parse(self):
@@ -1411,9 +1424,6 @@ class Parser:
     def ClassOrVarOrFunc(self):
         res = ParseResult()
 
-        funcTypes = VARTYPES
-        funcTypes.append(VOID)
-
         public = True if self.currTok.value == PUBLIC else False
         static = False
         const = False
@@ -1445,7 +1455,7 @@ class Parser:
                 node.public = public
                 node.static = static
                 return res.success(node)
-            elif self.currTok.value in funcTypes:
+            elif self.currTok.value in FUNCTYPES:
                 node = res.register(self.function())
                 if res.error:
                     return res
@@ -2195,11 +2205,18 @@ class Parser:
 
 
 def run(fn, text):
+    # Reset data
+    global masterscript, metacode
+    masterscript = MasterScript([])
+    metacode = []
+    
+    # Lexing
     lexer = Lexer(fn, text)
     tokens, error = lexer.genTokens()
     if error:
         return None, error
 
+    # Parsing
     parser = Parser(fn, tokens)
     ast = parser.parse()
 
