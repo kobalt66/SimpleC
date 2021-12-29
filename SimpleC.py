@@ -880,7 +880,7 @@ class For:
         self.body = body
 
         self.start = self.variable.start
-        self.end = self.body.end
+        self.end = self.variable.end
 
     def __repr__(self):
         return f'\n\tFor Node : \n\t\tFunction name > {self.functionNode}\n\t\tVariables > {self.variables}\n\t\tStep variable > {self.variable}\n\t\tCondition > {self.condition}\n\t\tStep count > {self.steps}\n\t\tBody > {self.body}'
@@ -1952,7 +1952,9 @@ class Parser:
             if res.error:
                 return res
         elif self.currTok.value == FOR:
-            pass
+            statement = res.register(self._for())
+            if res.error:
+                return res
         elif self.currTok.value == IF:
             pass
         elif self.currTok.value == RETURN:
@@ -1997,10 +1999,9 @@ class Parser:
         elif self.currTok.type == IDENTIFIER:
             pass  # varaccess, dotaccess, ...
         elif self.currTok.value in VARTYPES:
-            node = res.register(self.defVar())
+            statement = res.register(self.defVar())
             if res.error:
                 return res
-            statement = node
 
         return res.success(statement)
 
@@ -2046,28 +2047,28 @@ class Parser:
                 else:
                     body.append(statement)
                 return res.success(While(None, variables, condition, body, do))
-            else:
-                while True:
-                    res.registerAdvance()
-                    self.advance()
 
-                    statement = res.tryRegister(self.statement())
-                    if not statement:
-                        self.reverse(res.reverseCount)
-                        break
-                    if res.error:
-                        return res
+            while True:
+                res.registerAdvance()
+                self.advance()
 
-                    if isinstance(statement, Variable):
-                        variables.append(statement)
-                    else:
-                        body.append(statement)
+                statement = res.tryRegister(self.statement())
+                if not statement:
+                    self.reverse(res.reverseCount)
+                    break
+                if res.error:
+                    return res
 
-                if not self.currTok.type == RCBRACKET:
-                    return res.failure(
-                        Error(
-                            "Expected '}'", SyntaxError,
-                            self.currTok.start, self.scriptName))
+                if isinstance(statement, Variable):
+                    variables.append(statement)
+                else:
+                    body.append(statement)
+
+            if not self.currTok.type == RCBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '}'", SyntaxError,
+                        self.currTok.start, self.scriptName))
         else:
             if not self.currTok.value == DO:
                 return res.failure(
@@ -2136,8 +2137,101 @@ class Parser:
                     Error(
                         "Expected ')'", SyntaxError,
                         self.currTok.start, self.scriptName))
-            
+
         return res.success(While(None, variables, condition, body, do))
+
+    def _for(self):
+        res = ParseResult()
+
+        variables = []
+        body = []
+
+        res.registerAdvance()
+        self.advance()
+
+        if not self.currTok.type == LBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '('.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
+
+        res.registerAdvance()
+        self.advance()
+
+        variable = res.register(self.defVar())
+        if res.error:
+            return res
+        if not variable.value:
+            return res.failure(
+                Error(
+                    "Expected value.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
+
+        res.registerAdvance()
+        self.advance()
+        condition = res.register(self.expr())
+
+        if res.error:
+            return res
+        if not self.currTok.type == ENDCOLUMN:
+            return res.failure(
+                Error(
+                    "Expected ';'.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
+
+        res.registerAdvance()
+        self.advance()
+
+        steps = res.register(self.expr())
+        if res.error:
+            return res
+
+        res.registerAdvance()
+        self.advance()
+        
+        if not self.currTok.type == RBRACKET:
+            return res.failure(
+                Error(
+                    "Expected ')'.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
+
+        res.registerAdvance()
+        self.advance()
+
+        if not self.currTok.type == LCBRACKET:
+            statement = res.register(self.statement())
+            if res.error:
+                return res
+
+            if isinstance(statement, Variable):
+                variables.append(statement)
+            else:
+                body.append(statement)
+            return res.success(For(None, variables, variable, condition, steps, body))
+
+        while True:
+            res.registerAdvance()
+            self.advance()
+
+            statement = res.tryRegister(self.statement())
+            if not statement:
+                self.reverse(res.reverseCount)
+                break
+            if res.error:
+                return res
+
+            if isinstance(statement, Variable):
+                variables.append(statement)
+            else:
+                body.append(statement)
+
+        if not self.currTok.type == RCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '}'.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
+
+        return res.success(For(None, variables, variable, condition, steps, body))
 
     def defVar(self):
         res = ParseResult()
@@ -2260,7 +2354,7 @@ class Parser:
         return self.bin_op(self.factor, (MULTIPLY, DIVIDE))
 
     def arith_expr(self):
-        return self.bin_op(self.term, (PLUS, MINUS))
+        return self.bin_op(self.term, (PLUS, MINUS, PLUSPLUS, MINUSMINUS))
 
     def comp_expr(self):
         res = ParseResult()
@@ -2279,9 +2373,9 @@ class Parser:
             self.arith_expr, (ISEQUALTO, NOT, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
         if res.error:
             return res
-        
+
         return res.success(node)
-        
+
     def expr(self):
         res = ParseResult()
 
@@ -2334,8 +2428,15 @@ class Parser:
 
         res = ParseResult()
         left = res.register(func_a())
+        if isinstance(left, BinOpNode):
+            if left.op.type in (PLUSPLUS, MINUSMINUS):
+                return res.success(left)
         if res.error:
             return res
+
+        if not isinstance(left, BinOpNode) and self.currTok.type in (PLUSPLUS, MINUSMINUS):
+            op_tok = self.currTok
+            return res.success(BinOpNode(left, op_tok, Number(INT, Token(INT, "1", self.currTok.start, self.currTok.end))))
 
         while self.currTok.type in ops:
             op_tok = self.currTok
@@ -2376,6 +2477,7 @@ def run(fn, text):
 # TODOs :
 #
 # - VarAccess, DotAccess, ... (someclass.othervar)
+# - Check for /= *= += -=
 # - Lists
-# - if, for
+# - if statements
 # - override
