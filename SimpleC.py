@@ -242,9 +242,6 @@ class Position:
     def copy(self):
         return Position(self.idx, self.ln, self.col, self.fn, self.ftxt)
 
-    def __repr__(self):
-        return f'{self.ln}'
-
 
 class Token:
     def __init__(self, type, value=None, start=None, end=None):
@@ -267,16 +264,15 @@ class Token:
 
 
 class Error:
-    def __init__(self, message, errorType, line, column, fileName):
+    def __init__(self, message, errorType, position, fileName):
         self.message = message
         self.errorType = errorType
-        self.line = line
-        self.column = column
+        self.position = position
         self.fileName = fileName
 
     def throw(self):
         print(
-            f'{self.errorType} in {self.fileName} (line: {self.line}, {self.column}):\n\t\t{self.message}')
+            f'{self.errorType} in {self.fileName} (line: {self.position.ln - 1}, {self.position.col}):\n\t\t{self.message}')
 
 
 ##################
@@ -896,17 +892,18 @@ class SimpleFor:
 
 
 class While:
-    def __init__(self, functionNode, variables, condition, body):
+    def __init__(self, functionNode, variables, condition, body, do):
         self.functionNode = functionNode
         self.variables = variables
         self.condition = condition
         self.body = body
+        self.do = do
 
         self.start = self.condition.start
-        self.end = self.body.end
+        self.end = self.condition.end
 
     def __repr__(self):
-        return f'\n\tWhile Node : \n\t\tFunction name > {self.functionNode}\n\t\tVariables > {self.variables}\n\t\tCondition > {self.condition}\n\t\tBody > {self.body}'
+        return f'\n\tWhile Node : \n\t\tFunction name > {self.functionNode}\n\t\tVariables > {self.variables}\n\t\tCondition > {self.condition}\n\t\tBody > {self.body} \n\t\tExecute first > {self.do}'
 
 
 class Struct:
@@ -1151,7 +1148,7 @@ class ParseResult:
 
     def tryRegister(self, res):
         if res.error:
-            print('\n\n This error can be ignored: \n')
+            print('\n This error can be ignored: \n')
             res.error.throw()
             print('\n')
             self.reverseCount = res.advanceCount
@@ -1203,7 +1200,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected valid expression...", PARSEERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         masterscript.libs.append(res.node)
         return res
@@ -1262,7 +1259,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "No valid expression found.", PARSEERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             res.registerAdvance()
             self.advance()
@@ -1289,7 +1286,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected '='.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             res.registerAdvance()
             self.advance()
@@ -1298,7 +1295,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected string.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             libName = self.currTok
             node = MetaCode(LIB, libName)
@@ -1310,7 +1307,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected identifier.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             name = self.currTok
             res.registerAdvance()
@@ -1321,7 +1318,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected valid metavalue.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
             self.reverse()
 
             node = MetaCode(DEFINE, name, value)
@@ -1333,7 +1330,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected identifier.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             node = MetaCode(METIF, self.currTok)
         elif self.currTok.value == METELIF:
@@ -1344,7 +1341,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected identifier.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             node = MetaCode(METELIF, self.currTok)
         elif self.currTok.value == METELSE:
@@ -1369,7 +1366,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected identifier.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         name = self.currTok
         res.registerAdvance()
@@ -1379,7 +1376,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '{'.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         while True:
             res.registerAdvance()
@@ -1396,7 +1393,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Cannot define variables inside a namespace.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
             elif isinstance(expr, Class):
                 expr.namespace = name
                 classes.append(expr)
@@ -1411,7 +1408,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '}'.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         return res.success(Namespace(self.scriptName, None, name, childSpaces, classes, structs))
 
@@ -1469,12 +1466,12 @@ class Parser:
             node.const = const
             return res.success(node)
         elif self.currTok.type == IDENTIFIER:
-            pass # varaccess, dotaccess, ...
-        
+            pass  # varaccess, dotaccess, ...
+
         return res.failure(
             Error(
                 "Expected valid class, variable or function...", PARSEERROR,
-                self.currTok.start, self.currTok.end, self.scriptName))
+                self.currTok.start, self.scriptName))
 
     def struct(self):
         res = ParseResult()
@@ -1488,7 +1485,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected indentifier.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         name = self.currTok
         res.registerAdvance()
@@ -1498,7 +1495,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '{'", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         res.registerAdvance()
         self.advance()
@@ -1517,14 +1514,14 @@ class Parser:
                 return res.failure(
                     Error(
                         "It is not possible to define a class or struct inside a struct!", PARSEERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
             elif isinstance(node, Variable):
                 node.public = True
                 if node.static:
                     return res.failure(
                         Error(
                             "A variable cannot be static inside a struct.", SYNTAXERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
+                            self.currTok.start, self.scriptName))
                 variables.append(node)
             elif isinstance(node, Function):
                 if node.constructor:
@@ -1533,7 +1530,7 @@ class Parser:
                     return res.failure(
                         Error(
                             "It is not possible to define a function inside a struct!", PARSEERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
+                            self.currTok.start, self.scriptName))
 
             res.registerAdvance()
             self.advance()
@@ -1542,12 +1539,12 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '}'", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
         if len(constructors) == 0:
             return res.failure(
                 Error(
                     "Expected at least one constructor!", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         return res.success(Struct(self.scriptName, None, None, externNameSpaces, variables, name, constructors))
 
@@ -1565,7 +1562,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected indentifier.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         name = self.currTok
         res.registerAdvance()
@@ -1575,7 +1572,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '{'", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         res.registerAdvance()
         self.advance()
@@ -1594,7 +1591,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "It is not possible to define a class or struct inside a class!", PARSEERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
             elif isinstance(node, Variable):
                 variables.append(node)
             elif isinstance(node, Function):
@@ -1607,7 +1604,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '}'", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         return res.success(Class(self.scriptName, None, None, externNameSpaces, variables, False, False, name, constructors, functions))
 
@@ -1626,7 +1623,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected indentifier.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             name = self.currTok.value
             usings.append(Using(name))
@@ -1638,7 +1635,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             res.registerAdvance()
             self.advance()
@@ -1656,7 +1653,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected identifier.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         name = self.currTok
         res.registerAdvance()
@@ -1666,7 +1663,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '('.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         res.registerAdvance()
         self.advance()
@@ -1681,7 +1678,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected variable type.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             type = self.currTok
             res.registerAdvance()
@@ -1691,7 +1688,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected identifier.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             argName = self.currTok
             res.registerAdvance()
@@ -1708,7 +1705,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected ','.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             res.registerAdvance()
             self.advance()
@@ -1723,7 +1720,7 @@ class Parser:
                     return res.failure(
                         Error(
                             "Expected identifier.", SYNTAXERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
+                            self.currTok.start, self.scriptName))
 
                 varName = self.currTok.value
                 res.registerAdvance()
@@ -1733,7 +1730,7 @@ class Parser:
                     return res.failure(
                         Error(
                             "Expected '('.", SYNTAXERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
+                            self.currTok.start, self.scriptName))
 
                 res.registerAdvance()
                 self.advance()
@@ -1742,12 +1739,12 @@ class Parser:
                     return res.failure(
                         Error(
                             "Expected identifier.", SYNTAXERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
+                            self.currTok.start, self.scriptName))
 
                 valueVarName = self.currTok.value
                 res.registerAdvance()
                 self.advance()
-                
+
                 type = None
                 for i in args:
                     if i.name.value == valueVarName:
@@ -1757,13 +1754,13 @@ class Parser:
                     return res.failure(
                         Error(
                             f"Parameter with the name '{valueVarName}' does not exist.", PARSEERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
-                
+                            self.currTok.start, self.scriptName))
+
                 if not self.currTok.type == RBRACKET:
                     return res.failure(
                         Error(
                             "Expected ')'.", SYNTAXERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
+                            self.currTok.start, self.scriptName))
 
                 body.append(Variable(None, None, None, False, False,
                             False, type, varName, valueVarName))
@@ -1777,7 +1774,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '{'.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         # Build Body
         while True:
@@ -1797,19 +1794,19 @@ class Parser:
                     return res.failure(
                         Error(
                             "'public', 'static' and 'const' are not allowed in a function.", SYNTAXERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
+                            self.currTok.start, self.scriptName))
                 else:
                     variables.append(statement)
             elif isinstance(statement, Class) or isinstance(statement, Struct) or isinstance(statement, Function):
                 return res.failure(
                     Error(
                         "Functions, classes and structs cannot be defined inside a constructor.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
             elif isinstance(statement, Break) or isinstance(statement, Continue) or isinstance(statement, Return):
                 return res.failure(
                     Error(
                         "Break points, continues and returns cannot be defined inside a constructor.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
             elif isinstance(statement, If) or isinstance(statement, For) or isinstance(statement, While):
                 statement.functionNode = name
                 body.append(statement)
@@ -1818,7 +1815,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '}'.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         return res.success(Function(None, variables, True, False, False, False, CONSTRUCTOR, None, args, body))
 
@@ -1837,7 +1834,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected identifier.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         name = self.currTok
         res.registerAdvance()
@@ -1847,7 +1844,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '('.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         res.registerAdvance()
         self.advance()
@@ -1862,7 +1859,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected variable type.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             type = self.currTok
             res.registerAdvance()
@@ -1872,7 +1869,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected identifier.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             argName = self.currTok
             res.registerAdvance()
@@ -1889,7 +1886,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected ','.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             res.registerAdvance()
             self.advance()
@@ -1898,7 +1895,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '{'.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         # Build Body
         while True:
@@ -1921,19 +1918,19 @@ class Parser:
                     return res.failure(
                         Error(
                             "'public', 'static' and 'const' are not allowed in a function.", SYNTAXERROR,
-                            self.currTok.start, self.currTok.end, self.scriptName))
+                            self.currTok.start, self.scriptName))
                 else:
                     variables.append(statement)
             elif isinstance(statement, Class) or isinstance(statement, Struct) or isinstance(statement, Function):
                 return res.failure(
                     Error(
                         "Functions, classes and structs cannot be defined inside a function.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
             elif isinstance(statement, Break) or isinstance(statement, Continue):
                 return res.failure(
                     Error(
                         "Break points and continues cannot be defined inside a function.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
             elif isinstance(statement, If) or isinstance(statement, For) or isinstance(statement, While):
                 statement.functionNode = name
                 body.append(statement)
@@ -1942,7 +1939,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected '}'.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         return res.success(Function(None, variables, False, False, False, False, returnType, name, args, body))
 
@@ -1950,8 +1947,10 @@ class Parser:
         res = ParseResult()
 
         statement = None
-        if self.currTok.value == WHILE:
-            pass
+        if self.currTok.value in (WHILE, DO):
+            statement = res.register(self._while())
+            if res.error:
+                return res
         elif self.currTok.value == FOR:
             pass
         elif self.currTok.value == IF:
@@ -1970,7 +1969,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             statement = Return(None, returnTok)
         elif self.currTok.value == CONTINUE:
@@ -1981,9 +1980,9 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
-            return res.success(Continue(None, self.currTok.start, self.currTok.end))
+            return res.success(Continue(self.currTok.start, self.currTok.end))
         elif self.currTok.value == BREAK:
             res.registerAdvance()
             self.advance()
@@ -1992,9 +1991,9 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
-            return res.success(Break(None, self.currTok.start, self.currTok.end))
+            return res.success(Break(self.currTok.start, self.currTok.end))
         elif self.currTok.type == IDENTIFIER:
             pass  # varaccess, dotaccess, ...
         elif self.currTok.value in VARTYPES:
@@ -2004,6 +2003,141 @@ class Parser:
             statement = node
 
         return res.success(statement)
+
+    def _while(self):
+        res = ParseResult()
+
+        variables = []
+        body = []
+        do = False
+
+        if self.currTok.value == WHILE:
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == LBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '('", SyntaxError,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+            condition = res.register(self.expr())
+            if res.error:
+                return res
+
+            if not self.currTok.type == RBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected ')'", SyntaxError,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == LCBRACKET:
+                statement = res.register(self.statement())
+                if res.error:
+                    return res
+
+                if isinstance(statement, Variable):
+                    variables.append(statement)
+                else:
+                    body.append(statement)
+                return res.success(While(None, variables, condition, body, do))
+            else:
+                while True:
+                    res.registerAdvance()
+                    self.advance()
+
+                    statement = res.tryRegister(self.statement())
+                    if not statement:
+                        self.reverse(res.reverseCount)
+                        break
+                    if res.error:
+                        return res
+
+                    if isinstance(statement, Variable):
+                        variables.append(statement)
+                    else:
+                        body.append(statement)
+
+                if not self.currTok.type == RCBRACKET:
+                    return res.failure(
+                        Error(
+                            "Expected '}'", SyntaxError,
+                            self.currTok.start, self.scriptName))
+        else:
+            if not self.currTok.value == DO:
+                return res.failure(
+                    Error(
+                        "Expected do { ... }.", SyntaxError,
+                        self.currTok.start, self.scriptName))
+
+            do = True
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == LCBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '{'", SyntaxError,
+                        self.currTok.start, self.scriptName))
+
+            while True:
+                res.registerAdvance()
+                self.advance()
+
+                statement = res.tryRegister(self.statement())
+                if not statement:
+                    self.reverse(res.reverseCount)
+                    break
+                if res.error:
+                    return res
+
+                if isinstance(statement, Variable):
+                    variables.append(statement)
+                else:
+                    body.append(statement)
+
+            if not self.currTok.type == RCBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '}'", SyntaxError,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.value == WHILE:
+                return res.failure(
+                    Error(
+                        "Expected while (...).", SyntaxError,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == LBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '('", SyntaxError,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+            condition = res.register(self.expr())
+            if res.error:
+                return res
+
+            if not self.currTok.type == RBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected ')'", SyntaxError,
+                        self.currTok.start, self.scriptName))
+            
+        return res.success(While(None, variables, condition, body, do))
 
     def defVar(self):
         res = ParseResult()
@@ -2016,7 +2150,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected identifier.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         name = self.currTok.value
         res.registerAdvance()
@@ -2027,7 +2161,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
 
             return res.success(Variable(None, None, None, False, False, False, type, name, None))
 
@@ -2042,7 +2176,7 @@ class Parser:
             return res.failure(
                 Error(
                     "Expected ';'.", SYNTAXERROR,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+                    self.currTok.start, self.scriptName))
 
         return res.success(Variable(None, None, None, False, False, False, type, name, value))
 
@@ -2092,7 +2226,7 @@ class Parser:
                 return res.failure(
                     Error(
                         "Expected ')'", SyntaxError,
-                        self.currTok.start, self.currTok.end, self.scriptName))
+                        self.currTok.start, self.scriptName))
         elif tok.type == KEYWORD:
             node = res.register(self.expr())
             if res.error:
@@ -2103,7 +2237,7 @@ class Parser:
         return res.failure(
             Error(
                 "Expected number, identifier, '+', '-' or '('", SyntaxError,
-                self.currTok.start, self.currTok.end, self.scriptName))
+                self.currTok.start, self.scriptName))
 
     def power(self):
         return self.bin_op(self.atom, POWER, self.factor)
@@ -2125,6 +2259,29 @@ class Parser:
     def term(self):
         return self.bin_op(self.factor, (MULTIPLY, DIVIDE))
 
+    def arith_expr(self):
+        return self.bin_op(self.term, (PLUS, MINUS))
+
+    def comp_expr(self):
+        res = ParseResult()
+
+        if self.currTok.type == NOT:
+            op_tok = self.currTok
+            res.registerAdvance()
+            self.advance()
+
+            node = res.register(self.comp_expr())
+            if res.error:
+                return res
+            return res.success(UnaryNode(op_tok, node))
+
+        node = res.register(self.bin_op(
+            self.arith_expr, (ISEQUALTO, NOT, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
+        if res.error:
+            return res
+        
+        return res.success(node)
+        
     def expr(self):
         res = ParseResult()
 
@@ -2163,14 +2320,11 @@ class Parser:
             if res.error:
                 return res
             return res.success(node)
-        
-        node = res.register(self.bin_op(self.term, (PLUS, MINUS)))
+
+        node = res.register(self.bin_op(self.comp_expr, (AND, OR)))
 
         if res.error:
-            return res.failure(
-                Error(
-                    "Expected variable, identifier, '+', '-' or '('", SyntaxError,
-                    self.currTok.start, self.currTok.end, self.scriptName))
+            return res
 
         return res.success(node)
 
@@ -2205,7 +2359,7 @@ def run(fn, text):
     global masterscript, metacode
     masterscript = MasterScript([])
     metacode = []
-    
+
     # Lexing
     lexer = Lexer(fn, text)
     tokens, error = lexer.genTokens()
@@ -2223,6 +2377,5 @@ def run(fn, text):
 #
 # - VarAccess, DotAccess, ... (someclass.othervar)
 # - Lists
-# - if, for, while, do...while
-# - Comperation operations (!= ? < > >= <= & |)
+# - if, for
 # - override
