@@ -46,7 +46,7 @@ public class CLASS
 {
     public void Func()
     {    
-        while (i < 0)
-            flt a = 1.0;
+        while (i < 0) flt a = 1.0;
+        for (int i = 100; i < 10; i--) continue;
     }
 }
