@@ -259,7 +259,7 @@
         using someNameSpace;
         using someNameSpace.otherSpace;
         
-        private void main()
+        private function void main()
         {
             var newA = a();
         }
