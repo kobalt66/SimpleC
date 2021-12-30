@@ -2720,7 +2720,7 @@ def run(fn, text):
 
 # TODOs :
 #
-# - VarAccess, DotAccess, ... (someclass.othervar)
-# - Check for /= *= += -=
+# - VarAccess, DotAccess, ... (someclass.othervar) !DON'T FORGET USINGS!
+# - Check for reasigning variables (a /= 1; a *= 1; a += 1; a -= 1; a = 1;)
 # - Lists
 # - override
