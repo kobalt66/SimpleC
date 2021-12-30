@@ -22,7 +22,7 @@ namespace nSpace
             {
             }
 
-            public static void Func(var a, bol checked) 
+            public static function void Func(var a, bol checked) 
             {
                 return null;
             }
