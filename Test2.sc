@@ -44,9 +44,14 @@ namespace nSpace
 
 public class CLASS
 {
-    public void Func()
+    public function int Func()
     {    
         while (i < 0) flt a = 1.0;
         for (int i = 100; i < 10; i--) continue;
+                             
+        int a = 5;
+        if ((a % 2) ? 0) return a;
+        elif (!((a % 2) ? 0)) return null;
+        else return 10;
     }
 }
