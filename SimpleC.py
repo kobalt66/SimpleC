@@ -924,21 +924,21 @@ class Class:
 # The overriden function will only be overriden for the script the override function is being called
 
 
-class Override:
-    def __init__(self, classNode, functionNode, variables, returnType, name, args, body):
-        self.classNode = classNode
-        self.functionNode = functionNode
+class OverrideFunction:
+    def __init__(self, _class, function, variables, args, body):
+        self._class = _class
+        self.function = function
         self.variables = variables
-        self.returnType = returnType
-        self.name = name
         self.args = args
         self.body = body
 
-        self.start = self.returnType.start
-        self.end = self.body.end
-
     def __repr__(self):
-        return f'\n\Override Node : \n\t\tClass name > {self.classNode}\n\t\tFunction to override > {self.functionNode}\n\t\tVariables > {self.variables}\n\t\tReturn type > {self.returnType}\n\t\tName > {self.name}\n\t\tParameters > {self.args}\n\t\tBody > {self.body}'
+        return f'\n\tOverride Node : \n\t\tClass name > {self._class}\n\t\tFunction to override > {self.function}\n\t\tVariables > {self.variables}\n\t\tParameters > {self.args}\n\t\tBody > {self.body}'
+
+
+class OverrideOperation:
+    # Maybe
+    pass
 
 
 class Function:
@@ -1448,7 +1448,7 @@ class Parser:
             node.const = const
             return res.success(node)
         elif self.currTok.type == IDENTIFIER:
-            node = res.register(self.accessPoints())
+            node = res.register(self.accessPointOrIdentifier())
             if not node:
                 node = res.register(self.atom())
                 if res.error:
@@ -1587,7 +1587,7 @@ class Parser:
                         self.currTok.start, self.scriptName))
             elif isinstance(node, Variable):
                 variables.append(node)
-            elif isinstance(node, Function):
+            elif isinstance(node, Function) or isinstance(node, OverrideFunction):
                 functions.append(node)
 
             res.registerAdvance()
@@ -1929,6 +1929,159 @@ class Parser:
 
         return res.success(Function(None, variables, False, False, False, False, returnType, name, args, body))
 
+    def overrideFunc(self):
+        res = ParseResult()
+        
+        args = []
+        body = []
+        variables = []
+        
+        res.registerAdvance()
+        self.advance()
+        
+        if not self.currTok.type == IDENTIFIER:
+            return res.failure(
+                Error(
+                    "Expected class name.", SyntaxError,
+                    self.currTok.start, self.scriptName))
+
+        className = self.currTok.value
+        res.registerAdvance()
+        self.advance()
+        
+        if not self.currTok.type == COLON:
+            return res.failure(
+                Error(
+                    "Expected ':'.", SyntaxError,
+                    self.currTok.start, self.scriptName))
+        
+        res.registerAdvance()
+        self.advance()
+        
+        if not self.currTok.type == COLON:
+            return res.failure(
+                Error(
+                    "Expected '::'.", SyntaxError,
+                    self.currTok.start, self.scriptName))
+        
+        res.registerAdvance()
+        self.advance()
+        
+        if not self.currTok.type == IDENTIFIER:
+            return res.failure(
+                Error(
+                    "Expected class name.", SyntaxError,
+                    self.currTok.start, self.scriptName))
+        
+        funcName = self.currTok.value
+        res.registerAdvance()
+        self.advance()
+        
+        if not self.currTok.type == LBRACKET:
+            return res.failure(
+                Error(
+                    "Expected class '('.", SyntaxError,
+                    self.currTok.start, self.scriptName))
+        
+        res.registerAdvance()
+        self.advance()
+        
+        # Get parameters
+        while True:
+            if self.currTok.type == RBRACKET:
+                res.registerAdvance()
+                self.advance()
+                break
+            if not self.currTok.type == VARTYPE:
+                return res.failure(
+                    Error(
+                        "Expected variable type.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            type = self.currTok
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == IDENTIFIER:
+                return res.failure(
+                    Error(
+                        "Expected identifier.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            argName = self.currTok
+            res.registerAdvance()
+            self.advance()
+
+            args.append(Variable(None, None, None, False,
+                        False, True, type, argName, None))
+
+            if self.currTok.type == RBRACKET:
+                res.registerAdvance()
+                self.advance()
+                break
+            if not self.currTok.type == COMMA:
+                return res.failure(
+                    Error(
+                        "Expected ','.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+        
+        if not self.currTok.type == LCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '{'.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
+
+        # Build Body
+        while True:
+            res.registerAdvance()
+            self.advance()
+
+            statement = res.tryRegister(self.statement())
+            if not statement:
+                self.reverse(res.reverseCount)
+                break
+            if res.error:
+                return res
+
+            if isinstance(statement, Return):
+                statement.functionNode = funcName
+                body.append(statement)
+            elif isinstance(statement, Variable):
+                statement.public = False
+                if statement.static or statement.const:
+                    return res.failure(
+                        Error(
+                            "'public', 'static' and 'const' are not allowed in a function.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
+                else:
+                    variables.append(statement)
+            elif isinstance(statement, Class) or isinstance(statement, Struct) or isinstance(statement, Function):
+                return res.failure(
+                    Error(
+                        "Functions, classes and structs cannot be defined inside a function.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+            elif isinstance(statement, Break) or isinstance(statement, Continue):
+                return res.failure(
+                    Error(
+                        "Break points and continues cannot be defined inside a function.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+            elif isinstance(statement, If) or isinstance(statement, For) or isinstance(statement, While):
+                statement.functionNode = funcName
+                body.append(statement)
+            else:
+                body.append(statement)
+
+        if not self.currTok.type == RCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '}'.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
+
+        return res.success(OverrideFunction(className, funcName, variables, args, body))
+        
     def statement(self):
         res = ParseResult()
 
@@ -2464,12 +2617,12 @@ class Parser:
                 op_tok = self.currTok
                 res.registerAdvance()
                 self.advance()
-                
+
                 if not self.currTok.type == ENDCOLUMN:
                     return res.failure(
-                    Error(
-                        "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.scriptName))
+                        Error(
+                            "Expected ';'.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
 
                 return res.success(ReasignVar(currTok.value, op_tok, Number(INT, Token(INT, "1", self.currTok.start, self.currTok.end))))
             op_tok = self.currTok
@@ -2571,7 +2724,7 @@ class Parser:
                 return res.success(DotAccess(currTok, None, expr))
             elif isinstance(expr, ReasignVar):
                 return res.success(DotAccess(currTok, None, expr))
-            
+
         return res.failure(
             Error(
                 "Expected valid access point.", SYNTAXERROR,
@@ -2741,6 +2894,12 @@ class Parser:
                 return res
 
             return res.success(node)
+        elif self.currTok.value == OVERRIDE:
+            node = res.register(self.overrideFunc())
+            if res.error:
+                return res
+            
+            return res.success(node)
         elif self.currTok.type == KEYWORD:
             node = res.register(self.ClassOrVarOrFunc())
             if res.error:
@@ -2821,4 +2980,3 @@ def run(fn, text):
 # TODOs :
 #
 # - Lists
-# - override
