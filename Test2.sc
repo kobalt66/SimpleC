@@ -58,13 +58,11 @@ namespace nSpace
 
 public class CLASS
 {
-    using test.space.other.test.other;
-    public function int Func()
-    {    
-        //while (i < 0) flt a = 1.0;
-        //for (int i = 100; i < 10; i--) continue;
-                             
+    int i = 1;
+    public function var Func()
+    {                        
         CLASS test = test.CLASS();
-        test.test.test.Func(1, "NAME");
+        test.a++;
+        return test;
     }
 }
