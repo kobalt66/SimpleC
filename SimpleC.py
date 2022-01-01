@@ -900,11 +900,6 @@ class Struct:
     def __repr__(self):
         return f'\n\tStruct Node : \n\t\tScript name > {self.script}\n\t\tLibrary name > {self.lib}\n\t\tNamespace name > {self.namespace}\n\t\tUsing namespaces > {self.externNameSpaces}\n\t\tVariables > {self.variables}\n\t\tName > {self.name}\n\t\tConstructors > {self.constructors}'
 
-# Doesn't have to have a cunstructor. Variables can be changeg by accessing the Class like this:
-#
-# SomeClass test = SomeClass();
-# test.a = 1;
-
 
 class Class:
     def __init__(self, script, lib, namespace, externNameSpaces, variables, public, static, name, constructors, body):
