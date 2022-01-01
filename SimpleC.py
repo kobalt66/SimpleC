@@ -724,9 +724,15 @@ class Variable:
         condition = 'const' if self.const else condition
         return f'\n\tVariable Node : \n\t\tLibrary > {self.lib}\n\t\tNamespace > {self.namespace}\n\t\tClass > {self.classNode}\n\t\tPublic > {self.public}\n\t\tStatic/Const > {condition}\n\t\tType > {self.type}\n\t\tName > {self.name}\n\t\tValue > {self.value}'
 
-# a -= 1; a = 1; a *= 12;
+
 class ReasignVar:
-    pass
+    def __init__(self, name, op, value):
+        self.name = name
+        self.op = op
+        self.value = value
+
+    def __repr__(self):
+        return f'\n\tReasignVar Node : \n\t\nVariable > {self.name} \n\t\t{self.op} \n\t\t{self.value}'
 
 
 class VarAccess:
@@ -755,7 +761,7 @@ class DotAccess:
             return f'\n\tDotAccess Node : \n\t\tParent > {self.parent}\n\t\tVariable > {self.var}'
         elif self.node:
             return f'\n\tDotAccess Node : \n\t\tParent > {self.parent}\n\t\tNode > {self.node}'
-     
+
     def getType(self):
         return DOA
 
@@ -1421,7 +1427,7 @@ class Parser:
             elif self.currTok.value == FUNCTION:
                 res.registerAdvance()
                 self.advance()
-                
+
                 if self.currTok.value in FUNCTYPES:
                     node = res.register(self.function())
                     if res.error:
@@ -1453,7 +1459,7 @@ class Parser:
                 if res.error:
                     return res
                 return res.success(node)
-                
+
             if isinstance(node, Variable):
                 node.public = public
                 node.static = static
@@ -1919,7 +1925,7 @@ class Parser:
                 body.append(statement)
             else:
                 body.append(statement)
-            
+
         if not self.currTok.type == RCBRACKET:
             return res.failure(
                 Error(
@@ -1983,7 +1989,7 @@ class Parser:
                         self.currTok.start, self.scriptName))
 
             return res.success(Break(self.currTok.start, self.currTok.end))
-        elif self.currTok.type == IDENTIFIER:
+        elif self.currTok.type == IDENTIFIER or self.currTok.type == KEYWORD and self.currTok.value == THIS:
             statement = res.tryRegister(self.accessPointOrIdentifier())
             if not statement:
                 statement = res.register(self.atom())
@@ -2179,7 +2185,7 @@ class Parser:
 
         res.registerAdvance()
         self.advance()
-        
+
         if not self.currTok.type == RBRACKET:
             return res.failure(
                 Error(
@@ -2226,17 +2232,17 @@ class Parser:
 
     def ifelifelse(self, ifType):
         res = ParseResult()
-        
+
         condition = None
         variables = []
         body = []
         cases = []
         elseCase = None
-        
+
         if ifType == IF:
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == LBRACKET:
                 return res.failure(
                     Error(
@@ -2245,173 +2251,25 @@ class Parser:
 
             res.registerAdvance()
             self.advance()
-            
+
             condition = res.register(self.expr())
             if res.error:
                 return res
-            
+
             if not self.currTok.type == RBRACKET:
                 return res.failure(
                     Error(
                         "Expected ')'.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
-            
-            res.registerAdvance()
-            self.advance()
-            
-            if not self.currTok.type == LCBRACKET:
-                statement = res.register(self.statement())
-                if res.error:
-                    return res
-                
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                elif isinstance(statement, Break) or isinstance(statement, Continue):
-                        return res.failure(
-                            Error(
-                                "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
-                                self.currTok.start, self.scriptName))
-                else:
-                    body.append(statement)
-            else:
-                while True:
-                    res.registerAdvance()
-                    self.advance()
-                    
-                    statement = res.tryRegister(self.statement())
-                    if not statement:
-                        self.reverse(res.reverseCount)
-                        break
-                    if res.error:
-                        return res
-                    
-                    
-                    if isinstance(statement, Variable):
-                        variables.append(statement)
-                    elif isinstance(statement, Break) or isinstance(statement, Continue):
-                        return res.failure(
-                            Error(
-                                "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
-                                self.currTok.start, self.scriptName))
-                    else:
-                        body.append(statement)
-                
-                if not self.currTok.type == RCBRACKET:
-                    return res.failure(
-                        Error(
-                            "Expected '}'.", SYNTAXERROR,
-                            self.currTok.start, self.scriptName))
-            
-            res.registerAdvance()
-            self.advance()
-            
-            if not self.currTok.value == ELIF:
-                if not self.currTok.value == ELSE:
-                    self.reverse()
-                    return res.success(If(None, condition, variables, body, cases, elseCase))
-                else:
-                    elseCase = res.register(self.ifelifelse(ELSE))
-                    if res.error:
-                        return res
-                    
-                    return res.success(If(None, condition, variables, body, cases, elseCase)) 
-            else:
-                while True:
-                    _elif = res.register(self.ifelifelse(ELIF))
-                    if res.error:
-                        return res
 
-                    cases.append(_elif)
-                    res.registerAdvance()
-                    self.advance()
-                    
-                    if self.currTok.value == ELIF:
-                        continue
-                    elif self.currTok.value == ELSE:
-                        elseCase = res.register(self.ifelifelse(ELSE))
-                        if res.error:
-                            return res
-                        
-                        return res.success(If(None, condition, variables, body, cases, elseCase))
-                    else:
-                        self.reverse()
-                        return res.success(If(None, condition, variables, body, cases, elseCase))
-        elif ifType == ELIF:
             res.registerAdvance()
             self.advance()
-            
-            if not self.currTok.type == LBRACKET:
-                return res.failure(
-                    Error(
-                        "Expected '('.", SYNTAXERROR,
-                        self.currTok.start, self.scriptName))
-            
-            res.registerAdvance()
-            self.advance()
-            
-            condition = res.register(self.expr())
-            if res.error:
-                return res
-            
-            if not self.currTok.type == RBRACKET:
-                return res.failure(
-                    Error(
-                        "Expected ')'.", SYNTAXERROR,
-                        self.currTok.start, self.scriptName))
-            
-            res.registerAdvance()
-            self.advance()
-            
-            if not self.currTok.type == LCBRACKET:
-                statement = res.register(self.statement())
-                if res.error:
-                    return res
-                
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                elif isinstance(statement, Break) or isinstance(statement, Continue):
-                        return res.failure(
-                            Error(
-                                "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
-                                self.currTok.start, self.scriptName))
-                else:
-                    body.append(statement)
-            else:
-                while True:
-                    res.registerAdvance()
-                    self.advance()
-                    
-                    statement = res.tryRegister(self.statement())
-                    if not statement:
-                        self.reverse(res.reverseCount)
-                        break
-                    if res.error:
-                        return res
 
-                    if isinstance(statement, Variable):
-                        variables.append(statement)
-                    elif isinstance(statement, Break) or isinstance(statement, Continue):
-                        return res.failure(
-                            Error(
-                                "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
-                                self.currTok.start, self.scriptName))
-                    else:
-                        body.append(statement)
-                
-                if not self.currTok.type == RCBRACKET:
-                    return res.failure(
-                        Error(
-                            "Expected '}'.", SYNTAXERROR,
-                            self.currTok.start, self.scriptName))
-        elif ifType == ELSE:
-            res.registerAdvance()
-            self.advance()
-            
             if not self.currTok.type == LCBRACKET:
                 statement = res.register(self.statement())
                 if res.error:
                     return res
-                
+
                 if isinstance(statement, Variable):
                     variables.append(statement)
                 elif isinstance(statement, Break) or isinstance(statement, Continue):
@@ -2425,14 +2283,14 @@ class Parser:
                 while True:
                     res.registerAdvance()
                     self.advance()
-                    
+
                     statement = res.tryRegister(self.statement())
                     if not statement:
                         self.reverse(res.reverseCount)
                         break
                     if res.error:
-                        break    
-                    
+                        return res
+
                     if isinstance(statement, Variable):
                         variables.append(statement)
                     elif isinstance(statement, Break) or isinstance(statement, Continue):
@@ -2442,90 +2300,266 @@ class Parser:
                                 self.currTok.start, self.scriptName))
                     else:
                         body.append(statement)
-                        
+
                 if not self.currTok.type == RCBRACKET:
                     return res.failure(
                         Error(
                             "Expected '}'.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
-             
-        return res.success(If(None, condition, variables, body, None, None))    
-    
-    def accessPointOrIdentifier(self):
-        res = ParseResult()
-        
-        currTok = self.currTok
-        
-        res.registerAdvance()
-        self.advance()
-        
-        if self.currTok.type == ENDCOLUMN:
-            return res.success(VarAccess(None, currTok.value, currTok.start, currTok.end))
-        
-        if self.currTok.type == IDENTIFIER:
-            varName = self.currTok.value
+
             res.registerAdvance()
             self.advance()
-            
-            if not self.currTok.type == EQUALS:
+
+            if not self.currTok.value == ELIF:
+                if not self.currTok.value == ELSE:
+                    self.reverse()
+                    return res.success(If(None, condition, variables, body, cases, elseCase))
+                else:
+                    elseCase = res.register(self.ifelifelse(ELSE))
+                    if res.error:
+                        return res
+
+                    return res.success(If(None, condition, variables, body, cases, elseCase))
+            else:
+                while True:
+                    _elif = res.register(self.ifelifelse(ELIF))
+                    if res.error:
+                        return res
+
+                    cases.append(_elif)
+                    res.registerAdvance()
+                    self.advance()
+
+                    if self.currTok.value == ELIF:
+                        continue
+                    elif self.currTok.value == ELSE:
+                        elseCase = res.register(self.ifelifelse(ELSE))
+                        if res.error:
+                            return res
+
+                        return res.success(If(None, condition, variables, body, cases, elseCase))
+                    else:
+                        self.reverse()
+                        return res.success(If(None, condition, variables, body, cases, elseCase))
+        elif ifType == ELIF:
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == LBRACKET:
                 return res.failure(
                     Error(
-                        "Expected '='.", SYNTAXERROR,
+                        "Expected '('.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
-                
+
             res.registerAdvance()
             self.advance()
-            value = res.register(self.statement())
+
+            condition = res.register(self.expr())
             if res.error:
                 return res
-            
-            if isinstance(value, ArgAccess):
+
+            if not self.currTok.type == RBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected ')'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == LCBRACKET:
+                statement = res.register(self.statement())
+                if res.error:
+                    return res
+
+                if isinstance(statement, Variable):
+                    variables.append(statement)
+                elif isinstance(statement, Break) or isinstance(statement, Continue):
+                    return res.failure(
+                        Error(
+                            "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
+                else:
+                    body.append(statement)
+            else:
+                while True:
+                    res.registerAdvance()
+                    self.advance()
+
+                    statement = res.tryRegister(self.statement())
+                    if not statement:
+                        self.reverse(res.reverseCount)
+                        break
+                    if res.error:
+                        return res
+
+                    if isinstance(statement, Variable):
+                        variables.append(statement)
+                    elif isinstance(statement, Break) or isinstance(statement, Continue):
+                        return res.failure(
+                            Error(
+                                "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
+                                self.currTok.start, self.scriptName))
+                    else:
+                        body.append(statement)
+
+                if not self.currTok.type == RCBRACKET:
+                    return res.failure(
+                        Error(
+                            "Expected '}'.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
+        elif ifType == ELSE:
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == LCBRACKET:
+                statement = res.register(self.statement())
+                if res.error:
+                    return res
+
+                if isinstance(statement, Variable):
+                    variables.append(statement)
+                elif isinstance(statement, Break) or isinstance(statement, Continue):
+                    return res.failure(
+                        Error(
+                            "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
+                else:
+                    body.append(statement)
+            else:
+                while True:
+                    res.registerAdvance()
+                    self.advance()
+
+                    statement = res.tryRegister(self.statement())
+                    if not statement:
+                        self.reverse(res.reverseCount)
+                        break
+                    if res.error:
+                        break
+
+                    if isinstance(statement, Variable):
+                        variables.append(statement)
+                    elif isinstance(statement, Break) or isinstance(statement, Continue):
+                        return res.failure(
+                            Error(
+                                "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
+                                self.currTok.start, self.scriptName))
+                    else:
+                        body.append(statement)
+
+                if not self.currTok.type == RCBRACKET:
+                    return res.failure(
+                        Error(
+                            "Expected '}'.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
+
+        return res.success(If(None, condition, variables, body, None, None))
+
+    def accessPointOrIdentifier(self):
+        res = ParseResult()
+
+        currTok = self.currTok
+
+        res.registerAdvance()
+        self.advance()
+
+        if self.currTok.type in (EQUALS, PLUSPLUS, MINUSMINUS, PLUSEQUALS, MINUSEQUALS, DIVIDEEQUALS, MULTIPLYEQUALS):
+            if self.currTok.type in (PLUSPLUS, MINUSMINUS):
+                op_tok = self.currTok
                 res.registerAdvance()
                 self.advance()
                 
                 if not self.currTok.type == ENDCOLUMN:
                     return res.failure(
+                    Error(
+                        "Expected ';'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+                return res.success(ReasignVar(currTok.value, op_tok, Number(INT, Token(INT, "1", self.currTok.start, self.currTok.end))))
+            op_tok = self.currTok
+
+            res.registerAdvance()
+            self.advance()
+
+            right = res.register(self.expr())
+            if res.error:
+                return res
+
+            if not self.currTok.type == ENDCOLUMN:
+                return res.failure(
+                    Error(
+                        "Expected ';'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            return res.success(ReasignVar(currTok.value, op_tok, right))
+        if self.currTok.type == ENDCOLUMN:
+            return res.success(VarAccess(None, currTok.value, currTok.start, currTok.end))
+
+        if self.currTok.type == IDENTIFIER:
+            varName = self.currTok.value
+            res.registerAdvance()
+            self.advance()
+
+            if not self.currTok.type == EQUALS:
+                return res.failure(
+                    Error(
+                        "Expected '='.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+            value = res.register(self.statement())
+            if res.error:
+                return res
+
+            if isinstance(value, ArgAccess):
+                res.registerAdvance()
+                self.advance()
+
+                if not self.currTok.type == ENDCOLUMN:
+                    return res.failure(
                         Error(
                             "Expected ';'.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
-                
+
             return res.success(Variable(None, None, None, False, False, False, currTok, varName, value))
         elif self.currTok.type == LBRACKET:
             res.registerAdvance()
             self.advance()
-            
+
             args = []
-            
+
             if self.currTok.type == RBRACKET:
                 return res.success(ArgAccess(currTok.value, args))
-            
+
             while True:
                 argExpr = res.register(self.expr())
                 if res.error:
                     return res
-                
+
                 args.append(argExpr)
-                
+
                 if self.currTok.type == RBRACKET:
                     break
                 if not self.currTok.type == COMMA:
                     return res.failure(
                         Error(
                             "Expected identifier.", SYNTAXERROR,
-                            self.currTok.start, self.scriptName)) 
-                
+                            self.currTok.start, self.scriptName))
+
                 res.registerAdvance()
                 self.advance()
-                
+
             return res.success(ArgAccess(currTok.value, args))
         elif self.currTok.type == DOT:
             res.registerAdvance()
             self.advance()
-            
+
             expr = res.register(self.statement())
             if res.error:
                 return res
-            
+
             if isinstance(expr, VarAccess):
                 return res.success(DotAccess(currTok, expr, None))
             elif isinstance(expr, ArgAccess):
@@ -2536,16 +2570,18 @@ class Parser:
                         Error(
                             "Expected ';'.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
-                
+
                 return res.success(DotAccess(currTok, None, expr))
             elif isinstance(expr, DotAccess):
+                return res.success(DotAccess(currTok, None, expr))
+            elif isinstance(expr, ReasignVar):
                 return res.success(DotAccess(currTok, None, expr))
             
         return res.failure(
             Error(
                 "Expected valid access point.", SYNTAXERROR,
                 self.currTok.start, self.scriptName))
-    
+
     def defVar(self):
         res = ParseResult()
 
@@ -2727,7 +2763,7 @@ class Parser:
             if res.error:
                 return res
             return res.success(node)
-        
+
         node = res.register(self.bin_op(self.comp_expr, (AND, OR)))
 
         if res.error:
@@ -2789,6 +2825,5 @@ def run(fn, text):
 
 # TODOs :
 #
-# - Check for reasigning variables (a /= 1; a *= 1; a += 1; a -= 1; a = 1;)
 # - Lists
 # - override
