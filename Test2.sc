@@ -42,7 +42,7 @@ namespace nSpace
 }
 */
 
-public class CLASS
+/*public class CLASS
 {
     public function int Func()
     {    
@@ -53,5 +53,18 @@ public class CLASS
         if ((a % 2) ? 0) return a;
         elif (!((a % 2) ? 0)) return null;
         else return 10;
+    }
+}*/
+
+public class CLASS
+{
+    using test.space.other.test.other;
+    public function int Func()
+    {    
+        //while (i < 0) flt a = 1.0;
+        //for (int i = 100; i < 10; i--) continue;
+                             
+        CLASS test = test.CLASS();
+        test.test.test.Func(1, "NAME");
     }
 }
