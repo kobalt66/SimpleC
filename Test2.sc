@@ -62,7 +62,7 @@ public class CLASS
     public function var Func()
     {                        
         CLASS test = CLASS();
-        test.a++;
+        test.i++;
         return test;
     }
 }
