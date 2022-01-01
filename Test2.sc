@@ -61,8 +61,17 @@ public class CLASS
     int i = 1;
     public function var Func()
     {                        
-        CLASS test = CLASS();
+        CLASS test = test.CLASS();
         test.i++;
         return test;
+    }
+
+    override CLASS::Func()
+    {
+        CLASS newClass = CLASS();
+
+        newClass.i *= 100;
+
+        return newClass;
     }
 }
