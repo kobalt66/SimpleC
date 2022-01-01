@@ -61,7 +61,7 @@ public class CLASS
     int i = 1;
     public function var Func()
     {                        
-        CLASS test = test.CLASS();
+        CLASS test = CLASS();
         test.a++;
         return test;
     }
