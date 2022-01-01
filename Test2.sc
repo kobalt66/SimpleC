@@ -71,7 +71,9 @@ public class CLASS
         CLASS newClass = CLASS();
 
         newClass.i *= 100;
-
+        
+        var a = newClass.i;
+        
         return newClass;
     }
 }
