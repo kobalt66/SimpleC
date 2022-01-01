@@ -2763,11 +2763,18 @@ class Parser:
         if res.error:
             return res
 
-        if not self.currTok.type == ENDCOLUMN:
-            return res.failure(
-                Error(
-                    "Expected ';'.", SYNTAXERROR,
-                    self.currTok.start, self.scriptName))
+        if self.currTok.type == DOT:
+            self.reverse()
+            
+            value = res.register(self.statement())
+            if res.error:
+                return res   
+        else:
+            if not self.currTok.type == ENDCOLUMN:
+                return res.failure(
+                    Error(
+                        "Expected ';'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
 
         return res.success(Variable(None, None, None, False, False, False, type, name, value))
 
