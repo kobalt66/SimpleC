@@ -190,9 +190,7 @@ BON = 'binopnode'
 UNN = 'unarynode'
 VAC = 'varaccess'
 DOA = 'dotaccess'
-STA = 'structaccess'
-CLA = 'classaccess'
-FUA = 'funcaccess'
+AGA = 'argaccess'
 FUNCTYPES = [
     VOID,
     VAR,
@@ -274,7 +272,7 @@ class Error:
 
     def throw(self):
         print(
-            f'{self.errorType} in {self.fileName} (line: {self.position.ln - 1}, {self.position.col}):\n\t\t{self.message}')
+            f'{self.errorType} in {self.fileName} (line: {self.position.ln}, {self.position.col}):\n\t\t{self.message}')
 
 
 ##################
@@ -711,8 +709,9 @@ class Variable:
         self.value = value
 
         if self.value and not isinstance(self.value, str):
-            self.start = self.value.start
-            self.end = self.value.end if self.value else self.name.end
+            if not isinstance(self.value, DotAccess) and not isinstance(self.value, ArgAccess):
+                self.start = self.value.start
+                self.end = self.value.end if self.value else self.name.end
         elif not isinstance(self.name, str):
             self.start = self.name.start
             self.end = self.name.end
@@ -725,85 +724,52 @@ class Variable:
         condition = 'const' if self.const else condition
         return f'\n\tVariable Node : \n\t\tLibrary > {self.lib}\n\t\tNamespace > {self.namespace}\n\t\tClass > {self.classNode}\n\t\tPublic > {self.public}\n\t\tStatic/Const > {condition}\n\t\tType > {self.type}\n\t\tName > {self.name}\n\t\tValue > {self.value}'
 
+# a -= 1; a = 1; a *= 12;
+class ReasignVar:
+    pass
+
 
 class VarAccess:
     def __init__(self, classNode, varName, start, end):
         self.classNode = classNode
         self.varName = varName
-        self.dotAccess = None
 
         self.start = start
         self.end = end
 
     def __repr__(self):
-        return f'\n\tVarAccess Node : \n\t\tClass > {self.classNode}\n\t\tVariable name > {self.varName}\n\t\tDot-access > {self.dotAccess}'
+        return f'\n\tVarAccess Node : \n\t\tClass > {self.classNode}\n\t\tVariable name > {self.varName}'
 
     def getType(self):
         return VAC
 
 
 class DotAccess:
-    def __init__(self, parent, varName, dotAccess, structAccess, classAccess, funcAccess):
+    def __init__(self, parent, var, node):
         self.parent = parent
-        self.varName = varName
-        self.dotAccess = dotAccess
-        self.structAccess = structAccess
-        self.classAccess = classAccess
-        self.funcAccess = funcAccess
+        self.var = var
+        self.node = node
 
     def __repr__(self):
-        if self.dotAccess:
-            return f'\n\tDotAccess Node : \n\t\tParent > {self.parent}\n\t\tVariable name > {self.varName}\n\t\tDot-access > {self.dotAccess}'
-        else:
-            return f'\n\tDotAccess Node : \n\t\tParent > {self.parent}\n\t\tVariable name > {self.varName}\n\t\tStruct-access > {self.structAccess}\n\t\tClass-access > {self.classAccess}\n\t\tFunction-access > {self.funcAccess}'
-
+        if self.var:
+            return f'\n\tDotAccess Node : \n\t\tParent > {self.parent}\n\t\tVariable > {self.var}'
+        elif self.node:
+            return f'\n\tDotAccess Node : \n\t\tParent > {self.parent}\n\t\tNode > {self.node}'
+     
     def getType(self):
         return DOA
 
 
-class StructAccess:
+class ArgAccess:
     def __init__(self, name, args):
         self.name = name
         self.args = args
 
-        self.start = self.name.start
-        self.end = self.args.end
-
     def __repr__(self):
-        return f'\n\tCall-Class Node : \n\t\tStruct name > {self.name} Parameters > ({self.args})'
+        return f'\n\t ArgAccess Node : \n\t\tName > {self.name} ({self.args})'
 
     def getType(self):
-        return STA
-
-
-class ClassAccess:
-    def __init__(self, name, args):
-        self.name = name
-        self.args = args
-
-        self.start = self.name.start
-        self.end = self.args.end
-
-    def __repr__(self):
-        return f'\n\tCall-Class Node : \n\t\Class name > {self.name} Parameters > ({self.args})'
-
-    def getType(self):
-        return CLA
-
-
-class FuncAccess:
-    def __init__(self, name, args):
-        self.name = name
-        self.args = args
-
-        self.start = self.name.start
-        self.end = self.args.end
-
-    def __repr__(self):
-        return f'\n\tCall-Function Node : \n\t\tFunction name > {self.name} Parameters >  ({self.args})'
-
-    def getType(self):
-        return FUA
+        return AGA
 
 
 class List:
@@ -1481,7 +1447,18 @@ class Parser:
             node.const = const
             return res.success(node)
         elif self.currTok.type == IDENTIFIER:
-            pass  # varaccess, dotaccess, ...
+            node = res.register(self.accessPoints())
+            if not node:
+                node = res.register(self.atom())
+                if res.error:
+                    return res
+                return res.success(node)
+                
+            if isinstance(node, Variable):
+                node.public = public
+                node.static = static
+                node.const = const
+            return res.success(node)
 
         return res.failure(
             Error(
@@ -1634,17 +1611,8 @@ class Parser:
             res.registerAdvance()
             self.advance()
 
-            if not self.currTok.type == IDENTIFIER:
-                return res.failure(
-                    Error(
-                        "Expected indentifier.", SYNTAXERROR,
-                        self.currTok.start, self.scriptName))
-
-            name = self.currTok.value
+            name = res.register(self.statement())
             usings.append(Using(name))
-
-            res.registerAdvance()
-            self.advance()
 
             if not self.currTok.type == ENDCOLUMN:
                 return res.failure(
@@ -1949,7 +1917,9 @@ class Parser:
             elif isinstance(statement, If) or isinstance(statement, For) or isinstance(statement, While):
                 statement.functionNode = name
                 body.append(statement)
-
+            else:
+                body.append(statement)
+            
         if not self.currTok.type == RCBRACKET:
             return res.failure(
                 Error(
@@ -2014,7 +1984,11 @@ class Parser:
 
             return res.success(Break(self.currTok.start, self.currTok.end))
         elif self.currTok.type == IDENTIFIER:
-            pass  # varaccess, dotaccess, ...
+            statement = res.tryRegister(self.accessPointOrIdentifier())
+            if not statement:
+                statement = res.register(self.atom())
+                if res.error:
+                    return res
         elif self.currTok.value in VARTYPES:
             statement = res.register(self.defVar())
             if res.error:
@@ -2476,7 +2450,102 @@ class Parser:
                             self.currTok.start, self.scriptName))
              
         return res.success(If(None, condition, variables, body, None, None))    
+    
+    def accessPointOrIdentifier(self):
+        res = ParseResult()
         
+        currTok = self.currTok
+        
+        res.registerAdvance()
+        self.advance()
+        
+        if self.currTok.type == ENDCOLUMN:
+            return res.success(VarAccess(None, currTok.value, currTok.start, currTok.end))
+        
+        if self.currTok.type == IDENTIFIER:
+            varName = self.currTok.value
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == EQUALS:
+                return res.failure(
+                    Error(
+                        "Expected '='.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+                
+            res.registerAdvance()
+            self.advance()
+            value = res.register(self.statement())
+            if res.error:
+                return res
+            
+            if isinstance(value, ArgAccess):
+                res.registerAdvance()
+                self.advance()
+                
+                if not self.currTok.type == ENDCOLUMN:
+                    return res.failure(
+                        Error(
+                            "Expected ';'.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
+                
+            return res.success(Variable(None, None, None, False, False, False, currTok, varName, value))
+        elif self.currTok.type == LBRACKET:
+            res.registerAdvance()
+            self.advance()
+            
+            args = []
+            
+            if self.currTok.type == RBRACKET:
+                return res.success(ArgAccess(currTok.value, args))
+            
+            while True:
+                argExpr = res.register(self.expr())
+                if res.error:
+                    return res
+                
+                args.append(argExpr)
+                
+                if self.currTok.type == RBRACKET:
+                    break
+                if not self.currTok.type == COMMA:
+                    return res.failure(
+                        Error(
+                            "Expected identifier.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName)) 
+                
+                res.registerAdvance()
+                self.advance()
+                
+            return res.success(ArgAccess(currTok.value, args))
+        elif self.currTok.type == DOT:
+            res.registerAdvance()
+            self.advance()
+            
+            expr = res.register(self.statement())
+            if res.error:
+                return res
+            
+            if isinstance(expr, VarAccess):
+                return res.success(DotAccess(currTok, expr, None))
+            elif isinstance(expr, ArgAccess):
+                res.registerAdvance()
+                self.advance()
+                if not self.currTok.type == ENDCOLUMN:
+                    return res.failure(
+                        Error(
+                            "Expected ';'.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
+                
+                return res.success(DotAccess(currTok, None, expr))
+            elif isinstance(expr, DotAccess):
+                return res.success(DotAccess(currTok, None, expr))
+            
+        return res.failure(
+            Error(
+                "Expected valid access point.", SYNTAXERROR,
+                self.currTok.start, self.scriptName))
+    
     def defVar(self):
         res = ParseResult()
 
@@ -2658,7 +2727,7 @@ class Parser:
             if res.error:
                 return res
             return res.success(node)
-
+        
         node = res.register(self.bin_op(self.comp_expr, (AND, OR)))
 
         if res.error:
@@ -2720,7 +2789,6 @@ def run(fn, text):
 
 # TODOs :
 #
-# - VarAccess, DotAccess, ... (someclass.othervar) !DON'T FORGET USINGS!
 # - Check for reasigning variables (a /= 1; a *= 1; a += 1; a -= 1; a = 1;)
 # - Lists
 # - override
