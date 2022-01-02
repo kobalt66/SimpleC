@@ -76,7 +76,6 @@ LENGHTOF = 'lenghtof'
 NULL = 'null'
 FALSE = 'false'
 TRUE = 'true'
-THIS = 'this'
 USING = 'using'
 NAMESPACE = 'namespace'
 
@@ -107,7 +106,6 @@ KEYWORDS = [
     SIZEOF,
     TYPEOF,
     LENGHTOF,
-    THIS,
     USING,
     NAMESPACE
 ]
@@ -732,10 +730,15 @@ class ReasignVar:
         self.value = value
 
     def __repr__(self):
-        return f'\n\tReasignVar Node : \n\t\nVariable > {self.name} \n\t\t{self.op} \n\t\t{self.value}'
+        return f'\n\tReasignVar Node : \n\t\tVariable > {self.name} \n\t\t{self.op} \n\t\t{self.value}'
 
 
-class VarAccess:
+class AccessPoint:
+    def __init__(self):
+        self.type = 'accesspoint'
+
+
+class VarAccess(AccessPoint):
     def __init__(self, classNode, varName, start, end):
         self.classNode = classNode
         self.varName = varName
@@ -750,7 +753,7 @@ class VarAccess:
         return VAC
 
 
-class DotAccess:
+class DotAccess(AccessPoint):
     def __init__(self, parent, var, node):
         self.parent = parent
         self.var = var
@@ -766,7 +769,7 @@ class DotAccess:
         return DOA
 
 
-class ArgAccess:
+class ArgAccess(AccessPoint):
     def __init__(self, name, args):
         self.name = name
         self.args = args
@@ -806,8 +809,12 @@ class BinOpNode:
         self.op = op
         self.right = right
 
-        self.start = self.left.start
-        self.end = self.right.end
+        if not isinstance(self.left, AccessPoint):
+            self.start = self.left.start
+            self.end = self.left.end
+        else:
+            self.start = Position(0, 0, 0, '', '')
+            self.end = Position(0, 0, 0, '', '')
 
     def __repr__(self):
         return f'\n\tBinary Op Node : \n\t\tLeft node > {self.left}\n\t\tOperator > {self.op}\n\t\tRight node > {self.right}'
@@ -965,13 +972,10 @@ class Function:
 
 
 class Return:
-    def __init__(self, functionNode, returnTok):
+    def __init__(self, functionNode, returnTok, start, end):
         self.functionNode = functionNode
         self.returnType = returnTok.getType() if returnTok else VOID
         self.returnValue = returnTok if returnTok else VOID
-
-        self.start = returnTok.start if returnTok else None
-        self.end = returnTok.end if returnTok else None
 
     def __repr__(self):
         return f'\n\tReturn Node : \n\t\tFunction name > {self.functionNode}\n\t\tReturn type > {self.returnType}\n\t\tReturn value > {self.returnValue}'
@@ -1121,7 +1125,7 @@ class ParseResult:
 
     def tryRegister(self, res):
         if res.error:
-            print('\n This error can be ignored: \n')
+            print('\n Side Error: \n')
             res.error.throw()
             print('\n')
             self.reverseCount = res.advanceCount
@@ -1448,12 +1452,7 @@ class Parser:
             node.const = const
             return res.success(node)
         elif self.currTok.type == IDENTIFIER:
-            node = res.register(self.accessPointOrIdentifier())
-            if not node:
-                node = res.register(self.atom())
-                if res.error:
-                    return res
-                return res.success(node)
+            node = res.register(self.expr())
 
             if isinstance(node, Variable):
                 node.public = public
@@ -1587,7 +1586,12 @@ class Parser:
                         self.currTok.start, self.scriptName))
             elif isinstance(node, Variable):
                 variables.append(node)
-            elif isinstance(node, Function) or isinstance(node, OverrideFunction):
+            elif isinstance(node, Function):
+                if node.constructor:
+                    constructors.append(node)
+                else:
+                    functions.append(node)
+            elif isinstance(node, OverrideFunction):
                 functions.append(node)
 
             res.registerAdvance()
@@ -1613,6 +1617,11 @@ class Parser:
             self.advance()
 
             name = res.register(self.statement())
+            if not isinstance(name, AccessPoint):
+                return res.failure(
+                    Error(
+                        "Expected nested namespace name or a single namespace name.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
             usings.append(Using(name))
 
             if not self.currTok.type == ENDCOLUMN:
@@ -1794,6 +1803,8 @@ class Parser:
             elif isinstance(statement, If) or isinstance(statement, For) or isinstance(statement, While):
                 statement.functionNode = name
                 body.append(statement)
+            else:
+                body.append(statement)
 
         if not self.currTok.type == RCBRACKET:
             return res.failure(
@@ -1931,14 +1942,14 @@ class Parser:
 
     def overrideFunc(self):
         res = ParseResult()
-        
+
         args = []
         body = []
         variables = []
-        
+
         res.registerAdvance()
         self.advance()
-        
+
         if not self.currTok.type == IDENTIFIER:
             return res.failure(
                 Error(
@@ -1948,44 +1959,44 @@ class Parser:
         className = self.currTok.value
         res.registerAdvance()
         self.advance()
-        
+
         if not self.currTok.type == COLON:
             return res.failure(
                 Error(
                     "Expected ':'.", SyntaxError,
                     self.currTok.start, self.scriptName))
-        
+
         res.registerAdvance()
         self.advance()
-        
+
         if not self.currTok.type == COLON:
             return res.failure(
                 Error(
                     "Expected '::'.", SyntaxError,
                     self.currTok.start, self.scriptName))
-        
+
         res.registerAdvance()
         self.advance()
-        
+
         if not self.currTok.type == IDENTIFIER:
             return res.failure(
                 Error(
                     "Expected class name.", SyntaxError,
                     self.currTok.start, self.scriptName))
-        
+
         funcName = self.currTok.value
         res.registerAdvance()
         self.advance()
-        
+
         if not self.currTok.type == LBRACKET:
             return res.failure(
                 Error(
                     "Expected class '('.", SyntaxError,
                     self.currTok.start, self.scriptName))
-        
+
         res.registerAdvance()
         self.advance()
-        
+
         # Get parameters
         while True:
             if self.currTok.type == RBRACKET:
@@ -2027,7 +2038,7 @@ class Parser:
 
             res.registerAdvance()
             self.advance()
-        
+
         if not self.currTok.type == LCBRACKET:
             return res.failure(
                 Error(
@@ -2081,7 +2092,7 @@ class Parser:
                     self.currTok.start, self.scriptName))
 
         return res.success(OverrideFunction(className, funcName, variables, args, body))
-        
+
     def statement(self):
         res = ParseResult()
 
@@ -2114,7 +2125,8 @@ class Parser:
                         "Expected ';'.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
 
-            statement = Return(None, returnTok)
+            statement = Return(
+                None, returnTok, self.currTok.start, self.currTok.end)
         elif self.currTok.value == CONTINUE:
             res.registerAdvance()
             self.advance()
@@ -2137,12 +2149,10 @@ class Parser:
                         self.currTok.start, self.scriptName))
 
             return res.success(Break(self.currTok.start, self.currTok.end))
-        elif self.currTok.type == IDENTIFIER or self.currTok.type == KEYWORD and self.currTok.value == THIS:
-            statement = res.tryRegister(self.accessPointOrIdentifier())
-            if not statement:
-                statement = res.register(self.atom())
-                if res.error:
-                    return res
+        elif self.currTok.type == IDENTIFIER:
+            statement = res.register(self.expr())
+            if res.error:
+                return res
         elif self.currTok.value in VARTYPES:
             statement = res.register(self.defVar())
             if res.error:
@@ -2364,7 +2374,7 @@ class Parser:
                 break
             if res.error:
                 return res
-
+            
             if isinstance(statement, Variable):
                 variables.append(statement)
             else:
@@ -2612,35 +2622,6 @@ class Parser:
         res.registerAdvance()
         self.advance()
 
-        if self.currTok.type in (EQUALS, PLUSPLUS, MINUSMINUS, PLUSEQUALS, MINUSEQUALS, DIVIDEEQUALS, MULTIPLYEQUALS):
-            if self.currTok.type in (PLUSPLUS, MINUSMINUS):
-                op_tok = self.currTok
-                res.registerAdvance()
-                self.advance()
-
-                if not self.currTok.type == ENDCOLUMN:
-                    return res.failure(
-                        Error(
-                            "Expected ';'.", SYNTAXERROR,
-                            self.currTok.start, self.scriptName))
-
-                return res.success(ReasignVar(currTok.value, op_tok, Number(INT, Token(INT, "1", self.currTok.start, self.currTok.end))))
-            op_tok = self.currTok
-
-            res.registerAdvance()
-            self.advance()
-
-            right = res.register(self.expr())
-            if res.error:
-                return res
-
-            if not self.currTok.type == ENDCOLUMN:
-                return res.failure(
-                    Error(
-                        "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.scriptName))
-
-            return res.success(ReasignVar(currTok.value, op_tok, right))
         if self.currTok.type == ENDCOLUMN:
             return res.success(VarAccess(None, currTok.value, currTok.start, currTok.end))
 
@@ -2657,14 +2638,11 @@ class Parser:
 
             res.registerAdvance()
             self.advance()
-            value = res.register(self.statement())
+            value = res.register(self.atom())
             if res.error:
                 return res
 
             if isinstance(value, ArgAccess):
-                res.registerAdvance()
-                self.advance()
-
                 if not self.currTok.type == ENDCOLUMN:
                     return res.failure(
                         Error(
@@ -2704,31 +2682,22 @@ class Parser:
             res.registerAdvance()
             self.advance()
 
-            expr = res.register(self.statement())
+            expr = res.register(self.atom())
             if res.error:
                 return res
 
             if isinstance(expr, VarAccess):
                 return res.success(DotAccess(currTok, expr, None))
             elif isinstance(expr, ArgAccess):
-                res.registerAdvance()
-                self.advance()
-                if not self.currTok.type == ENDCOLUMN:
-                    return res.failure(
-                        Error(
-                            "Expected ';'.", SYNTAXERROR,
-                            self.currTok.start, self.scriptName))
-
                 return res.success(DotAccess(currTok, None, expr))
             elif isinstance(expr, DotAccess):
                 return res.success(DotAccess(currTok, None, expr))
             elif isinstance(expr, ReasignVar):
                 return res.success(DotAccess(currTok, None, expr))
 
-        return res.failure(
-            Error(
-                "Expected valid access point.", SYNTAXERROR,
-                self.currTok.start, self.scriptName))
+        # If it's just an identifier
+        self.reverse()
+        return res.success(VarAccess(None, currTok.value, currTok.start, currTok.end))
 
     def defVar(self):
         res = ParseResult()
@@ -2763,18 +2732,11 @@ class Parser:
         if res.error:
             return res
 
-        if self.currTok.type == DOT:
-            self.reverse()
-            
-            value = res.register(self.statement())
-            if res.error:
-                return res   
-        else:
-            if not self.currTok.type == ENDCOLUMN:
-                return res.failure(
-                    Error(
-                        "Expected ';'.", SYNTAXERROR,
-                        self.currTok.start, self.scriptName))
+        if not self.currTok.type == ENDCOLUMN:
+            return res.failure(
+                Error(
+                    "Expected ';'.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
 
         return res.success(Variable(None, None, None, False, False, False, type, name, value))
 
@@ -2809,6 +2771,60 @@ class Parser:
         elif tok.type == IDENTIFIER or tok.value in PREDEFINED:
             res.registerAdvance()
             self.advance()
+
+            if self.currTok.type in (EQUALS, PLUSPLUS, MINUSMINUS, PLUSEQUALS, MINUSEQUALS, DIVIDEEQUALS, MULTIPLYEQUALS):
+                self.reverse()
+                left = VarAccess(None, self.currTok.value,
+                                 self.currTok.start, self.currTok.end)
+
+                res.registerAdvance()
+                self.advance()
+
+                if self.currTok.type in (PLUSPLUS, MINUSMINUS):
+                    op_tok = self.currTok
+
+                    res.registerAdvance()
+                    self.advance()
+
+                    if not self.currTok.type == ENDCOLUMN:
+                        return res.failure(
+                            Error(
+                                "Expected ';'.", SYNTAXERROR,
+                                self.currTok.start, self.scriptName))
+
+                    return res.success(ReasignVar(left, op_tok, Number(INT, Token(INT, "1", self.currTok.start, self.currTok.end))))
+                op_tok = self.currTok
+
+                res.registerAdvance()
+                self.advance()
+
+                right = res.register(self.expr())
+                if res.error:
+                    return res
+
+                if not self.currTok.type == ENDCOLUMN:
+                    return res.failure(
+                        Error(
+                            "Expected ';'.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
+
+                return res.success(ReasignVar(left, op_tok, right))
+            if self.currTok.type in (DOT, IDENTIFIER, LBRACKET):
+                self.reverse()
+
+                value = res.register(self.accessPointOrIdentifier())
+                if res.error:
+                    return res
+                
+                self.advance()
+                
+                if not self.currTok.type == ENDCOLUMN:
+                    self.reverse()
+                else:
+                    res.registerAdvance()
+                    
+                return res.success(value)
+
             return res.success(VarAccess(None, tok, tok.start, tok.end))
         elif tok.type == LBRACKET:
             res.registerAdvance()
@@ -2905,7 +2921,7 @@ class Parser:
             node = res.register(self.overrideFunc())
             if res.error:
                 return res
-            
+
             return res.success(node)
         elif self.currTok.type == KEYWORD:
             node = res.register(self.ClassOrVarOrFunc())
@@ -2987,3 +3003,4 @@ def run(fn, text):
 # TODOs :
 #
 # - Lists
+# - for (each: obj in someList)
