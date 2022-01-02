@@ -99,6 +99,17 @@ namespace testSpace
             {
                 CLASS newClass = CLASS(1, "CLASS NAME");
                 str name = newClass.name;
+
+                for (int i = 10; i > newClass.i; i--;)
+                {
+                    if (i <= 1) { print("NOOOOO"); return; }
+                    elif (i ? 5) { print("Nooo2"); }
+
+                    print("asdf");
+                }
+                
+                str msg = "Return: " + newClass.i;
+                print("Return: ");
                 return newClass.i;
             }
         }
