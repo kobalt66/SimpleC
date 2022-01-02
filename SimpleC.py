@@ -188,6 +188,7 @@ BON = 'binopnode'
 UNN = 'unarynode'
 VAC = 'varaccess'
 DOA = 'dotaccess'
+LIA = 'listaccess'
 AGA = 'argaccess'
 FUNCTYPES = [
     VOID,
@@ -775,14 +776,27 @@ class ArgAccess(AccessPoint):
         self.args = args
 
     def __repr__(self):
-        return f'\n\t ArgAccess Node : \n\t\tName > {self.name} ({self.args})'
+        return f'\n\tArgAccess Node : \n\t\tName > {self.name} ({self.args})'
 
     def getType(self):
         return AGA
 
 
+class ListAccess(AccessPoint):
+    def __init__(self, name, elementIdx, start, end):
+        self.name = name
+        self.elementIdx = elementIdx
+
+        self.start = start
+        self.end = end
+        
+    def __repr__(self):
+        return f'\n\tListAccess Node: \n\t\tList name > {self.name}\n\t\tIndex > {self.elementIdx}'
+
 class List:
-    def __init__(self, classNode, public, static, const, type, name, elements, start, end):
+    def __init__(self, lib, namespace, classNode, public, static, const, type, name, elements, start, end):
+        self.lib = lib
+        self.namespace = namespace
         self.classNode = classNode
         self.public = public
         self.static = static
@@ -797,10 +811,19 @@ class List:
     def __repr__(self):
         condition = 'static' if self.static != None else ''
         condition = 'const' if self.const != None else condition
-        return f'\n\tList Node : \n\t\tClass > {self.classNode}\n\t\tPublic > {self.public}\n\t\tStatic/Const > {condition}\n\t\tType > {self.type}\n\t\tName > {self.name}\n\t\tElements > {self.elements}'
+        return f'\n\tList Node : \n\t\tLib > {self.lib}\n\t\tNamespace > {self.namespace}\n\t\tClass > {self.classNode}\n\t\tPublic > {self.public}\n\t\tStatic/Const > {condition}\n\t\tType > {self.type}\n\t\tName > {self.name}\n\t\tElements > {self.elements}'
 
     def getType(self):
         return self.type
+
+
+class ListSpace:
+    def __init__(self, length, elements):
+        self.length = length
+        self.elements = elements
+        
+    def __repr__(self):
+        return f'\n\tListSpace Node: \n\t\tLength > {self.length}\n\t\tElements > {self.elements}'
 
 
 class BinOpNode:
@@ -829,7 +852,7 @@ class UnaryNode:
         self.node = node
 
         self.start = self.op.start
-        self.end = self.node.end
+        self.end = self.op.end
 
     def __repr__(self):
         return f'\n\tUnary Node : \n\t\tOperator > {self.op}\n\t\tNode > {self.node}'
@@ -1221,7 +1244,7 @@ class Parser:
                 elif isinstance(node, Namespace):
                     node.lib = lib
                     namespaces.append(node)
-                elif isinstance(node, Variable):
+                elif isinstance(node, Variable) or isinstance(node, List):
                     node.lib = lib
                     global_variables.append(node)
                 elif isinstance(node, Class):
@@ -1584,7 +1607,7 @@ class Parser:
                     Error(
                         "It is not possible to define a class or struct inside a class!", PARSEERROR,
                         self.currTok.start, self.scriptName))
-            elif isinstance(node, Variable):
+            elif isinstance(node, Variable) or isinstance(node, List):
                 variables.append(node)
             elif isinstance(node, Function):
                 if node.constructor:
@@ -1593,7 +1616,7 @@ class Parser:
                     functions.append(node)
             elif isinstance(node, OverrideFunction):
                 functions.append(node)
-
+            
             res.registerAdvance()
             self.advance()
 
@@ -1907,7 +1930,7 @@ class Parser:
             if isinstance(statement, Return):
                 statement.functionNode = name
                 body.append(statement)
-            elif isinstance(statement, Variable):
+            elif isinstance(statement, Variable) or isinstance(statement, List):
                 statement.public = False
                 if statement.static or statement.const:
                     return res.failure(
@@ -2678,6 +2701,57 @@ class Parser:
                 self.advance()
 
             return res.success(ArgAccess(currTok.value, args))
+        elif self.currTok.type == LSBRACKET:
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == INT:
+                if not self.currTok.type == IDENTIFIER:
+                    return res.failure(
+                        Error(
+                            "Expected integer or identifier.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName)) 
+            
+            idx = self.currTok
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == RSBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected ']'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName)) 
+            
+            left = ListAccess(currTok.value, idx, self.currTok.start, self.currTok.end)
+            
+            self.advance()
+            if self.currTok.type == EQUALS:
+                res.registerAdvance()
+                
+                res.registerAdvance()
+                self.advance()
+                value = res.register(self.expr())
+                if res.error:
+                    return res
+                
+                if isinstance(value, ArgAccess):
+                    if not self.currTok.type == ENDCOLUMN:
+                        return res.failure(
+                            Error(
+                                "Expected ';'.", SYNTAXERROR,
+                                self.currTok.start, self.scriptName))
+
+                if not self.currTok.type == ENDCOLUMN:
+                    return res.failure(
+                        Error(
+                            "Expected ';'.", SYNTAXERROR,
+                            self.currTok.start, self.scriptName))
+                
+                return res.success(ReasignVar(left, EQUALS, value))
+            else:
+                self.reverse()
+        
+            return res.success(left)
         elif self.currTok.type == DOT:
             res.registerAdvance()
             self.advance()
@@ -2692,9 +2766,11 @@ class Parser:
                 return res.success(DotAccess(currTok, None, expr))
             elif isinstance(expr, DotAccess):
                 return res.success(DotAccess(currTok, None, expr))
+            elif isinstance(expr, ListAccess):
+                return res.success(DotAccess(currTok, expr, None))
             elif isinstance(expr, ReasignVar):
                 return res.success(DotAccess(currTok, None, expr))
-
+            
         # If it's just an identifier
         self.reverse()
         return res.success(VarAccess(None, currTok.value, currTok.start, currTok.end))
@@ -2705,7 +2781,45 @@ class Parser:
         type = self.currTok.value
         res.registerAdvance()
         self.advance()
+        
+        if self.currTok.type == LSBRACKET:
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == RSBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected ']'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+                
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == IDENTIFIER:
+                return res.failure(
+                Error(
+                    "Expected identifier.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
 
+            name = self.currTok.value
+            res.registerAdvance()
+            self.advance()   
+            
+            if not self.currTok.type == EQUALS:
+                return res.failure(
+                    Error(
+                        "Expected '='.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+            
+            value = res.register(self.listElements())
+            if res.error:
+                return res
+
+            return res.success(List(None, None, None, False, False, False, type, name, value, self.currTok.start, self.currTok.end))
+            
         if not self.currTok.type == IDENTIFIER:
             return res.failure(
                 Error(
@@ -2740,6 +2854,82 @@ class Parser:
 
         return res.success(Variable(None, None, None, False, False, False, type, name, value))
 
+    def listElements(self):
+        res = ParseResult()
+        
+        if self.currTok.type == VARTYPE:
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == LSBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '['.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+            
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == INT:
+                return res.failure(
+                    Error(
+                        "Expected integer.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            length = int(self.currTok.value)
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == RSBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '['.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+            
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == ENDCOLUMN:
+                return res.failure(
+                    Error(
+                        "Expected ';'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+            
+            return res.success(ListSpace(length, None))
+        
+        if not self.currTok.type == LCBRACKET:
+            return res.failure(
+                Error(
+                    "Expected '{'.", SYNTAXERROR,
+                    self.currTok.start, self.scriptName))
+        
+        elements = []
+        while True:
+            res.registerAdvance()
+            self.advance()
+        
+            element = res.tryRegister(self.expr())
+            if not element:
+                self.reverse(res.reverseCount)
+                break
+            if res.error:
+                return res
+
+            elements.append(element)
+            
+            if self.currTok.type == COMMA:
+                continue
+            
+            if not self.currTok.type == RCBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '}'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+            else:
+                break
+        
+        return res.success(ListSpace(len(elements), elements))
+                
     def atom(self):
         res = ParseResult()
         tok = self.currTok
@@ -2809,7 +2999,7 @@ class Parser:
                             self.currTok.start, self.scriptName))
 
                 return res.success(ReasignVar(left, op_tok, right))
-            if self.currTok.type in (DOT, IDENTIFIER, LBRACKET):
+            if self.currTok.type in (DOT, IDENTIFIER, LBRACKET, LSBRACKET):
                 self.reverse()
 
                 value = res.register(self.accessPointOrIdentifier())
@@ -2998,8 +3188,3 @@ def run(fn, text):
     ast = parser.parse()
 
     return ast.node, ast.error
-
-
-# TODOs :
-#
-# - Lists
