@@ -3003,4 +3003,3 @@ def run(fn, text):
 # TODOs :
 #
 # - Lists
-# - for (each: obj in someList)
