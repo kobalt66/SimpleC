@@ -190,7 +190,7 @@
 
     - For-Statements -
             
-        for (int i = 0; i < (sizoOfSomething); i++)
+        for (int i = 0; i < (sizoOfSomething); i++;)
         {
             ...
         }
@@ -221,10 +221,10 @@
         {
             b = 0;
         }
-        constructor(int a, str b)
+        constructor(int A, str B)
         {
-            this.a = a;
-            this.b = b;
+            a = A;
+            b = B;
         }
     }
 
