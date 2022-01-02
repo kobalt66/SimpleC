@@ -95,8 +95,10 @@
 
     > int[] list = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }     (list has a lenght of 10)
     > int[] list = int[5];                              (list has a lenght of 5)
-    > list[1] + 1 = 2 (return the value of the index 1)
+    > int i = list[1]; i + 1 = 2 (return the value of the index 1)
+    > list[1] = 1;
 
+    -> Be aware that the asignment doesn't really work with very complex expressions. (It's weird)
 
 - Keywords -
 
