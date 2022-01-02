@@ -27,3 +27,7 @@ It is open source: Use it, if you want, or make it better.
 
 You can create a new SimpleC script inside the project.
 (In step 6) To run those scripts you simply have to type in the file name of the script.
+
+
+The code is constantly updating! It could be the case that the code you download might not work as
+intended! Just wait for a new version of the code and your issues might be fixed.
