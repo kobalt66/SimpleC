@@ -61,7 +61,7 @@ namespace nSpace
     int i = 1;
     public function var Func()
     {                        
-        CLASS test = test.CLASS();
+        CLASS test = CLASS();
         test.i++;
         return test;
     }
