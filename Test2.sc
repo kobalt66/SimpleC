@@ -56,7 +56,7 @@ namespace nSpace
     }
 }*/
 
-public class CLASS
+/*public class CLASS
 {
     int i = 1;
     public function var Func()
@@ -75,5 +75,32 @@ public class CLASS
         var a = newClass.i;
         
         return newClass;
+    }
+}*/
+
+namespace testSpace
+{
+    namespace otherSpace
+    {
+        public class CLASS
+        {
+            using testSpace.otherSpace;
+
+            int i;
+            str name;
+
+            constructor(int I, str name)
+                : name(name)
+            {
+                i = I;
+            }
+
+            public function var Func()
+            {
+                CLASS newClass = CLASS(1, "CLASS NAME");
+                str name = newClass.name;
+                return newClass.i;
+            }
+        }
     }
 }
