@@ -156,10 +156,12 @@ METIF = 'metif'
 METELIF = 'metelif'
 METELSE = 'metelse'
 METENDIF = 'metendif'
+IMPORT = 'import'
 
 METAKEYWORD = 'METAKEYWORD'
 METAKEYWORDS = [
     LIB,
+    IMPORT,
     DEFINE,
     METIF,
     METELIF,
@@ -581,7 +583,7 @@ class Lexer:
 
         type = METAKEYWORD if value in METAKEYWORDS else None
         if type == None:
-            return None, Error("Expected 'metif', 'define', ...", ILLEGALCHAR, self.pos.ln, self.pos.col, self.fn)
+            return None, Error("Expected 'metif', 'define', ...", ILLEGALCHAR, self.pos, self.fn)
         return Token(type, value, start, self.pos), None
 
     def genString(self):
@@ -870,7 +872,7 @@ class If:
         self.cases = cases
         self.elseCase = elseCase
 
-        if self.condition:
+        if self.condition and not isinstance(self.condition, AccessPoint):
             self.start = self.condition.start
             self.end = self.condition.end
 
@@ -1232,6 +1234,8 @@ class Parser:
 
                 if metaNode.type == LIB:
                     lib = metaNode
+                elif metaNode.type == IMPORT:
+                    imports.append(metaNode)
                 else:
                     metacode.append(metaNode)
             elif self.currTok.type == KEYWORD:
@@ -1299,6 +1303,36 @@ class Parser:
 
             libName = self.currTok
             node = MetaCode(LIB, libName)
+        elif self.currTok.value == IMPORT:
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == LESS:
+                return res.failure(
+                    Error(
+                        "Expected '<'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == IDENTIFIER:
+                return res.failure(
+                    Error(
+                        "Expected identifier.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            libName = self.currTok 
+            res.registerAdvance()
+            self.advance()
+            
+            if not self.currTok.type == GREATER:
+                return res.failure(
+                    Error(
+                        "Expected '>'.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+
+            node = MetaCode(IMPORT, libName)
         elif self.currTok.value == DEFINE:
             res.registerAdvance()
             self.advance()
@@ -2689,12 +2723,14 @@ class Parser:
 
                 args.append(argExpr)
 
+                if self.currTok.type == ENDCOLUMN:
+                    self.reverse()
                 if self.currTok.type == RBRACKET:
                     break
                 if not self.currTok.type == COMMA:
                     return res.failure(
                         Error(
-                            "Expected identifier.", SYNTAXERROR,
+                            "Expected ','.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
 
                 res.registerAdvance()
@@ -3153,7 +3189,7 @@ class Parser:
         if not isinstance(left, BinOpNode) and self.currTok.type in (PLUSPLUS, MINUSMINUS):
             op_tok = self.currTok
             return res.success(BinOpNode(left, op_tok, Number(INT, Token(INT, "1", self.currTok.start, self.currTok.end))))
-
+        
         while self.currTok.type in ops:
             op_tok = self.currTok
             res.registerAdvance()
@@ -3188,3 +3224,5 @@ def run(fn, text):
     ast = parser.parse()
 
     return ast.node, ast.error
+
+
