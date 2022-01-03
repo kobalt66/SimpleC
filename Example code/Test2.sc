@@ -13,10 +13,7 @@ namespace nSpace
         public static class someClass
         {
             const int b = 0;
-            constructor(var a, int c)
-            : b(a), b(c)
-            {
-            }
+            constructor(var a, int c) : b(a), b(c)
             public static function void Func(var a, bol checked) 
             {
                 return null;
@@ -28,10 +25,7 @@ namespace nSpace
         struct TestStruct
         {
             const int b = 0; 
-            constructor(var a, int c)
-                : b(a), b(c)
-            {
-            }
+            constructor(var a, int c) : b(a), b(c)
         }
     }
 }
