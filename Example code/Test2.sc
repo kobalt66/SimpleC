@@ -1,66 +1,110 @@
-#lib = "std"
+/*
+This example code is the code that can be parsed at the current development state.
+Past the code in a script and run it in the console.
+*/
 
-namespace std
+/*private var a = 1;
+#lib = "someLib"
+#define MetaVar 1
+namespace nSpace
 {
-    namespace physics
+    namespace otherSpace
     {
-        struct Vec2
+        public static class someClass
         {
-            flt x;
-            flt y;
-            constructor(flt X, flt X)
+            const int b = 0;
+            constructor(var a, int c)
+            : b(a), b(c)
             {
-                x = X;
-                y = Y;
+            }
+            public static function void Func(var a, bol checked) 
+            {
+                return null;
             }
         }
-        struct Vec3
+    }
+    namespace otherSpace2
+    {
+        struct TestStruct
         {
-            flt x;
-            flt y;
-            flt z;
-            constructor(flt x, flt y, flt z) 
-                : x(x), y(y), z(z) {}
-        }
-        struct Vec4
-        {
-            flt x;
-            flt y;
-            flt z;
-            flt w;
-            constructor(flt x , flt y, flt z, flt w) 
-                : x(x), y(y), z(z), w(w) {}
+            const int b = 0; 
+            constructor(var a, int c)
+                : b(a), b(c)
+            {
+            }
         }
     }
 }
+*/
 
-private class Program
+/*public class CLASS
 {
-    using std.physics;
-    private function int main(var args)
-    {
-        // Create points.
-        Var2 one = Var2(1, 2);
-        Var2 two = Var2(2, 3);
-
-        // Calculation.
-        flt distance = calculate_DistanceVECtwo(one, two);
-
-        return 1;
+    public function int Func()
+    {    
+        while (i < 0) flt a = 1.0;
+        for (int i = 100; i < 10; i--) continue;
+                             
+        int a = 5;
+        if ((a % 2) ? 0) return a;
+        elif (!((a % 2) ? 0)) return null;
+        else return 10;
     }
+}*/
 
-    private function flt calculate_DistanceVECtwo(var a, var b)
+/*public class CLASS
+{
+    int i = 1;
+    public function var Func()
+    {                        
+        CLASS test = CLASS();
+        test.i++;
+        return test;
+    }
+    override CLASS::Func()
     {
-        // Checking if the two points are two dimensional.
-        bol check1 = !isClass(a, Vec2);
-        bol check2 = !isClass(b, Vec2);
-        if (check1 | check2) return;
+        CLASS newClass = CLASS();
+        newClass.i *= 100;
+        
+        var a = newClass.i;
+        
+        return newClass;
+    }
+}*/
 
-        // Calculating the distance between two points.
-        flt res1 = sqrt(b.y - a.y);
-        flt res2 = sqrt(b.x - a.x);
-        flt distance = res1 + res2;
+namespace testSpace
+{
+    namespace otherSpace
+    {
+        public class CLASS
+        {
+            using testSpace.otherSpace;
 
-        return distance;
+            int i;
+            str name;
+
+            constructor(int I, str name)
+                : name(name)
+            {
+                i = I;
+                Func();
+            }
+
+            public function var Func()
+            {
+                CLASS newClass = CLASS(1, "CLASS NAME");
+                
+                var a = CLASS(2, "CLASS NAME2");
+
+                newClass.Add(a);
+
+                return newClass;
+            }
+
+            public function void Add(var otherClass)
+            {
+                i += otherClass.i;
+                name = otherClass.name;
+            }
+        }
     }
 }
