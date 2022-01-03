@@ -2761,7 +2761,26 @@ class Parser:
             left = ListAccess(currTok.value, idx, self.currTok.start, self.currTok.end)
             
             self.advance()
-            if self.currTok.type == EQUALS:
+            if self.currTok.type == DOT:
+                res.registerAdvance()
+                
+                res.registerAdvance()
+                self.advance()
+                expr = res.register(self.atom())
+                if res.error:
+                    return res
+                
+                if isinstance(expr, VarAccess):
+                    return res.success(DotAccess(left, expr, None))
+                elif isinstance(expr, ArgAccess):
+                    return res.success(DotAccess(left, None, expr))
+                elif isinstance(expr, DotAccess):
+                    return res.success(DotAccess(left, None, expr))
+                elif isinstance(expr, ListAccess):
+                    return res.success(DotAccess(left, expr, None))
+                elif isinstance(expr, ReasignVar):
+                    return res.success(DotAccess(left, None, expr))
+            elif self.currTok.type == EQUALS:
                 res.registerAdvance()
                 
                 res.registerAdvance()
@@ -2945,6 +2964,13 @@ class Parser:
             self.advance()
         
             element = res.tryRegister(self.expr())
+            
+            self.advance()
+            if self.currTok.type in (COMMA, RCBRACKET):
+                res.registerAdvance()
+            else:
+                self.reverse()
+            
             if not element:
                 self.reverse(res.reverseCount)
                 break
