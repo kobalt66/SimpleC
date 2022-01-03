@@ -1821,10 +1821,8 @@ class Parser:
                     break
 
         if not self.currTok.type == LCBRACKET:
-            return res.failure(
-                Error(
-                    "Expected '{'.", SYNTAXERROR,
-                    self.currTok.start, self.scriptName))
+            self.reverse()
+            return res.success(Function(None, variables, True, False, False, False, CONSTRUCTOR, None, args, body))
 
         # Build Body
         while True:
