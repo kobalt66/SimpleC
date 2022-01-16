@@ -3299,7 +3299,9 @@ class compile2python:
             ' ',
             'class InvalidAccess(Exception):\n\tpass',
             ' ',
-            'class Var:\n\tdef __init__(self, public, static, const, type, name):\n\t\tself.public = public\n\t\tself.static = static\n\t\tself.const = const\n\t\tself.type = type\n\n\t\tself.name = name\n\t\tself.valType = None\n\t\tself.value = None\n\n\tdef getType(self):\n\t\treturn self.type\n\n\tdef equals(self, value):\n\t\tif self.const and self.value: raise SyntaxError(f\'{self.name} is a constant!\')\n\t\tif not isinstance(value, Var):\n\t\t\tif not self.getType() == VAR:\n\t\t\t\tif self.getType() == INT and not isinstance(value, int) or self.getType() == FLT and not isinstance(value, float) or self.getType() == DBL and not isinstance(value, float) or self.getType() == BOL and not isinstance(value, bool) or self.getType() == BYT and not isinstance(value, int) or self.getType() == STR and not isinstance(value, str) or self.getType() == CHR and (not isinstance(value, str) or len(value) > 1):\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value)} into {self.getType()}!\')\n\t\t\tself.value = value.value\n\t\telse:\n\t\t\tif not self.getType() == Var:\n\t\t\t\tif not self.getType() == value.getType():\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value.value)} into {self.getType()}!\')\n\t\t\tself.value = value.value\n\n\tdef compareType(self, value):\n\t\tif not isinstance(value, Var):\n\t\t\tif self.getType() == value:\n\t\t\t\traise SyntaxError(f\'' + '{self.name}' + ': cannot convert a {value} into {self.getType()}!\')',
+            'class arg:\n\tdef __init__(self, name, type, value):\n\t\tself.arg = Var(False, False, True, type, name, value)\n\t\tself.name = name\n\t\tself.type = type\n\t\tself.value = value'
+            ' ',
+            'class Var:\n\tdef __init__(self, public, static, const, type, name, value=None):\n\t\tself.public = public\n\t\tself.static = static\n\t\tself.const = const\n\t\tself.type = type\n\n\t\tself.name = name\n\t\tself.valType = None\n\t\tself.value = None if not value else value\n\n\tdef getType(self):\n\t\treturn self.type\n\n\tdef equals(self, value):\n\t\tif self.const and self.value: raise SyntaxError(f\'{self.name} is a constant!\')\n\t\tif not isinstance(value, Var):\n\t\t\tif not self.getType() == VAR:\n\t\t\t\tif self.getType() == INT and not isinstance(value, int) or self.getType() == FLT and not isinstance(value, float) or self.getType() == DBL and not isinstance(value, float) or self.getType() == BOL and not isinstance(value, bool) or self.getType() == BYT and not isinstance(value, int) or self.getType() == STR and not isinstance(value, str) or self.getType() == CHR and (not isinstance(value, str) or len(value) > 1):\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value)} into {self.getType()}!\')\n\t\t\tself.value = value.value\n\t\telse:\n\t\t\tif not self.getType() == Var:\n\t\t\t\tif not self.getType() == value.getType():\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value.value)} into {self.getType()}!\')\n\t\t\tself.value = value.value\n\n\tdef compareType(self, value):\n\t\tif not isinstance(value, Var):\n\t\t\tif self.getType() == value:\n\t\t\t\traise SyntaxError(f\'' + '{self.name}' + ': cannot convert a {value} into {self.getType()}!\')',
             ' ',
             "SCRIPT = 'script'",
             "LIB = 'library'",
@@ -3669,6 +3671,9 @@ class compile2python:
         self.write(f'\n\n{tab * tabs}{list} = [')
         
         # generate args
+        for arg in const.args:
+            self.write('')
+        
         
         # generate constructor function
         self.write(f'\n{tab * tabs}if args == {list}:')
