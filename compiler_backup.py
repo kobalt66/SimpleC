@@ -3302,7 +3302,7 @@ class compile2python:
             ' ',
             'class arg:\n\tdef __init__(self, name, type):\n\t\tself.arg = Var(False, False, True, type, name)\n\t\tself.name = name\n\t\tself.type = type',
             ' ',
-            'class Var:\n\tdef __init__(self, public, static, const, type, name, value=None):\n\t\tself.public = public\n\t\tself.static = static\n\t\tself.const = const\n\t\tself.type = type\n\n\t\tself.name = name\n\t\tself.valType = None\n\t\tself.value = None if not value else value\n\n\tdef getType(self):\n\t\treturn self.type\n\n\tdef equals(self, value):\n\t\tif self.const and self.value: raise SyntaxError(f\'{self.name} is a constant!\')\n\t\tif not isinstance(value, Var):\n\t\t\tif not self.getType() == VAR:\n\t\t\t\tif self.getType() == INT and not isinstance(value, int) or self.getType() == FLT and not isinstance(value, float) or self.getType() == DBL and not isinstance(value, float) or self.getType() == BOL and not isinstance(value, bool) or self.getType() == BYT and not isinstance(value, int) or self.getType() == STR and not isinstance(value, str) or self.getType() == CHR and (not isinstance(value, str) or len(value) > 1):\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value)} into {self.getType()}!\')\n\t\t\tself.value = value.value\n\t\telse:\n\t\t\tif not self.getType() == Var:\n\t\t\t\tif not self.getType() == value.getType():\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value.value)} into {self.getType()}!\')\n\t\t\tself.value = value.value\n\n\tdef compareType(self, value):\n\t\tif not isinstance(value, Var):\n\t\t\tif self.getType() == value:\n\t\t\t\traise SyntaxError(f\'' + '{self.name}' + ': cannot convert a {value} into {self.getType()}!\')',
+            'class Var:\n\tdef __init__(self, public, static, const, type, name, value=None):\n\t\tself.public = public\n\t\tself.static = static\n\t\tself.const = const\n\t\tself.type = type\n\n\t\tself.name = name\n\t\tself.valType = None\n\t\tself.value = None if not value else value\n\n\tdef getType(self):\n\t\treturn self.type\n\n\tdef equals(self, value):\n\t\tif self.const and self.value: raise SyntaxError(f\'{self.name} is a constant!\')\n\t\tif self.compareType(value):\n\t\t\tself.value = value.value\n\n\tdef compareType(self, value):\n\t\tif not isinstance(value, Var):\n\t\t\tif not self.getType() == VAR:\n\t\t\t\tif self.getType() == INT and not isinstance(value, int) or self.getType() == FLT and not isinstance(value, float) or self.getType() == DBL and not isinstance(value, float) or self.getType() == BOL and not isinstance(value, bool) or self.getType() == BYT and not isinstance(value, int) or self.getType() == STR and not isinstance(value, str) or self.getType() == CHR and (not isinstance(value, str) or len(value) > 1):\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value)} into {self.getType()}!\')\n\t\t\treturn True\n\t\telse:\n\t\t\tif not self.getType() == Var:\n\t\t\t\tif not self.getType() == value.getType():\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value.value)} into {self.getType()}!\')\n\t\t\treturn True',
             ' ',
             "SCRIPT = 'script'",
             "LIB = 'library'",
@@ -3682,14 +3682,15 @@ class compile2python:
         # generating arg list
         list = f'argList{num}'
         listStr = f'\n{tab * tabs}{list} = ['
-        [listStr.join(x + ',') for x in argNames]
+        for argName in argNames:
+            listStr += argName + ','
         listStr += ']'
         self.write(listStr)
 
         # generate constructor function
-        self.write(f'\n{tab * tabs}if args == {list}:')
+        self.write(f'\n{tab * tabs}if True == [{list}[x].arg.compareType(args[x]) for x in range(len(list))]:')
 
-        if len(const.variables) < 0 and len(const.body) < 0:
+        if len(const.variables) > 0 or len(const.body) > 0:
             # variables
             for var in const.variables:
                 if not var.name in varNames:
@@ -3708,6 +3709,8 @@ class compile2python:
                     return error
         else:
             self.write(f'\n{tab * tabs}\tpass')
+            
+        return None
 
     def function(self, func, parentPath):
         pass
@@ -3722,7 +3725,16 @@ class compile2python:
             self.write(
                 f'\n{tab * tabs}@!VM!@.{part.name}({self.genArgs(part)})')
             return None
-
+        elif isinstance(part, BinOpNode):
+            self.genBinOp(part.left, part.op, part.right)
+        
+        return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2PYERROR,
+                    Position(-1, -1, -1, '', ''), '<comiler>')
+    
+    def genBinOp(self, left, op, right):
+        tab = '\t'
+        
+    
     def genVariable(self, var, tabs, parentPath):
         tab = '\t'
         if parentPath:
