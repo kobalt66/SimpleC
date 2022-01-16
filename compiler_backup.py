@@ -17,6 +17,7 @@ from typing import Counter
 import string
 import os
 import numpy
+import random
 
 
 #############################
@@ -3299,7 +3300,7 @@ class compile2python:
             ' ',
             'class InvalidAccess(Exception):\n\tpass',
             ' ',
-            'class arg:\n\tdef __init__(self, name, type, value):\n\t\tself.arg = Var(False, False, True, type, name, value)\n\t\tself.name = name\n\t\tself.type = type\n\t\tself.value = value'
+            'class arg:\n\tdef __init__(self, name, type):\n\t\tself.arg = Var(False, False, True, type, name)\n\t\tself.name = name\n\t\tself.type = type',
             ' ',
             'class Var:\n\tdef __init__(self, public, static, const, type, name, value=None):\n\t\tself.public = public\n\t\tself.static = static\n\t\tself.const = const\n\t\tself.type = type\n\n\t\tself.name = name\n\t\tself.valType = None\n\t\tself.value = None if not value else value\n\n\tdef getType(self):\n\t\treturn self.type\n\n\tdef equals(self, value):\n\t\tif self.const and self.value: raise SyntaxError(f\'{self.name} is a constant!\')\n\t\tif not isinstance(value, Var):\n\t\t\tif not self.getType() == VAR:\n\t\t\t\tif self.getType() == INT and not isinstance(value, int) or self.getType() == FLT and not isinstance(value, float) or self.getType() == DBL and not isinstance(value, float) or self.getType() == BOL and not isinstance(value, bool) or self.getType() == BYT and not isinstance(value, int) or self.getType() == STR and not isinstance(value, str) or self.getType() == CHR and (not isinstance(value, str) or len(value) > 1):\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value)} into {self.getType()}!\')\n\t\t\tself.value = value.value\n\t\telse:\n\t\t\tif not self.getType() == Var:\n\t\t\t\tif not self.getType() == value.getType():\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value.value)} into {self.getType()}!\')\n\t\t\tself.value = value.value\n\n\tdef compareType(self, value):\n\t\tif not isinstance(value, Var):\n\t\t\tif self.getType() == value:\n\t\t\t\traise SyntaxError(f\'' + '{self.name}' + ': cannot convert a {value} into {self.getType()}!\')',
             ' ',
@@ -3318,7 +3319,10 @@ class compile2python:
         else:
             f = open(self.outputFile, 'x')
             f.close()
-
+    
+    def genHexCode(self):
+        return '{0:032x}'.format(random.randrange(16**32))
+    
     def getPath(self, name):
         for path in self.pathData:
             if path.compare(name):
@@ -3665,20 +3669,27 @@ class compile2python:
 
         # keep track of all the used names
         varNames = []
-        
+
+        # generate args
+        self.write('\n')
+        argNames = []
+        for arg in const.args:
+            argCode = 'p_' + self.genHexCode()
+            argNames.append(argCode)
+            self.write(
+                f'\n{tab * tabs}{argCode} = arg(\'{arg.name.value}\', \'{arg.type.value}\')')
+
         # generating arg list
         list = f'argList{num}'
-        self.write(f'\n\n{tab * tabs}{list} = [')
-        
-        # generate args
-        for arg in const.args:
-            self.write('')
-        
-        
+        listStr = f'\n{tab * tabs}{list} = ['
+        [listStr.join(x + ',') for x in argNames]
+        listStr += ']'
+        self.write(listStr)
+
         # generate constructor function
         self.write(f'\n{tab * tabs}if args == {list}:')
-        
-        if len(const.variables) < 0 and len(const.body) < 0: 
+
+        if len(const.variables) < 0 and len(const.body) < 0:
             # variables
             for var in const.variables:
                 if not var.name in varNames:
@@ -3688,7 +3699,7 @@ class compile2python:
                         return error
                 else:
                     return Error(f'You cannot use {var.name} twice.', COMP2PYERROR,
-                                Position(-1, -1, -1, '', ''), '<comiler>')
+                                 Position(-1, -1, -1, '', ''), '<comiler>')
 
             # body
             for part in const.body:
@@ -3697,7 +3708,7 @@ class compile2python:
                     return error
         else:
             self.write(f'\n{tab * tabs}\tpass')
-            
+
     def function(self, func, parentPath):
         pass
 
