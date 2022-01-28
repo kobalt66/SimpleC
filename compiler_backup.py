@@ -3902,7 +3902,8 @@ class compile2Csharp:
             currIdx += 1;
             if currIdx < maxIdx:
                 res += ', '
-                
+        
+        res += ')'
         return res
     
     def genDotaccess(self, var):
@@ -4001,7 +4002,8 @@ class compile2Csharp:
             self.write(f'\n{self.genBinOp(part.left, part.op, part.right)};')
             return None
         elif isinstance(part, List):
-            pass
+            self.genList(part, True)
+            return None
         elif isinstance(part, ReasignVar):
             if isinstance(part.name, str):
                 self.write(f'\n{self.genReasign(part.name, part.op, part.value)};')
@@ -4177,6 +4179,30 @@ class compile2Csharp:
         attributes += 'private ' if not var.public and not inBody else ''
         attributes += 'static ' if var.static else ''
         attributes += 'const ' if var.const else ''
+        if isinstance(var, List):
+            self.write(f'\n{attributes}{self.convertType2String(var.type)}[] {var.name}')
+            
+            if isinstance(var.elements, ListSpace):
+                if not var.elements.elements == None:
+                    self.write(' = {')
+                    
+                    currIdx = 0
+                    maxIdx = len(var.elements.elements)
+                    for e in var.elements.elements:
+                        currIdx += 1
+                        
+                        self.write(f' {self.genOperationPart(e)}')
+                        if currIdx < maxIdx:
+                            self.write(',')
+                            
+                    self.write(' };') 
+                else:
+                    self.write(f' = new {var.type}[{var.elements.length}];')
+            else:
+                print('Other list value type! Unexpected!!!!')
+            
+            return None
+        
         self.write(f'\n{attributes}{self.convertType2String(var.type)} {var.name}')
         
         if isinstance(var.value, AccessPoint):
@@ -4202,7 +4228,6 @@ class compile2Csharp:
                 self.write(';')
                 
         return None
-
 
 ####################
 # - Run Function - #
