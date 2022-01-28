@@ -3842,6 +3842,14 @@ class compile2Csharp:
 
         return None
 
+    def genString(self, var):
+        return f'"{var.value.value}"' if len(var.value.value) > 1 else f'\'{var.value.value}\''
+    
+    def genNumber(self, var):
+        res = str(var.value.value)
+        res += 'f' if var.type == FLT else ''
+        return res
+    
     def genArgs(self, var):
         value = ''
 
@@ -3876,10 +3884,9 @@ class compile2Csharp:
         maxIdx = len(access.args)
         for param in access.args:
             if isinstance(param, Number):
-                res += str(param.value.value)
-                res += 'f' if param.type == FLT else ''
+                res += self.genNumber(param)
             elif isinstance(param, String):
-                res += f'"{param.value.value}"' if len(param.value.value) > 1 else f'\'{param.value.value}\''
+                res += self.genString(param)
             elif isinstance(param, VarAccess):
                 res += param.varName.value
             elif isinstance(param, DotAccess):
@@ -3916,9 +3923,41 @@ class compile2Csharp:
 
         return value
     
+    def genListAccess(self, var):
+        pass
+    
+    def genUnaryOp(self, op, node):
+        return f'{op}{self.genOperationPart(node)}'
+    
     def genBinOp(self, left, op, right):
+        return f'{self.genOperationPart(left)} {op.value} {self.genOperationPart(right)}'  
+    
+    def genReasign(self, name, op, value):
+        return f'{name} {op} {self.genOperationPart(value)}'
+    
+    def genOperationPart(self, part):
+        res = ''
         
-        return None
+        if isinstance(part, DotAccess):
+            res = self.genDotaccess(part)
+        elif isinstance(part, ArgAccess):
+            res = self.genArgAccess(part)
+        elif isinstance(part, ListAccess):
+            res = self.genListAccess(part)
+        elif isinstance(part, VarAccess):
+            res = part.varName.value
+        elif isinstance(part, Number):
+            res = self.genNumber(part)
+        elif isinstance(part, String):
+            res = self.genString(part)
+        elif isinstance(part, BinOpNode):
+            res = f'({self.genBinOp(part.left, part.op, part.right)})'
+        elif isinstance(part, UnaryNode):
+            res = self.genUnaryOp(part.op, part.node)
+        else:
+            res = part.value.value
+        
+        return res
 
     def convertType2String(self, type):
         if type == BYT:
@@ -3948,9 +3987,14 @@ class compile2Csharp:
             self.write(f'{part.name}({self.genArgs(part)});')
             return None
         elif isinstance(part, BinOpNode):
-            self.genBinOp(part.left, part.op, part.right)
+            self.write(f'{self.genBinOp(part.left, part.op, part.right)};')
             return None
-
+        elif isinstance(part, List):
+            pass
+        elif isinstance(part, ReasignVar):
+            self.write(f'{self.genReasign(part.name.varName, part.op, part.value)};')
+            return None
+        
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
                      Position(-1, -1, -1, '', ''), '<comiler>')
 
