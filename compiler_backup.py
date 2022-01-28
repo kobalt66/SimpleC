@@ -3804,6 +3804,7 @@ class compile2Csharp:
 
         # keeping track of names
         self.classes = []
+        self.structs = []
 
         self.basicData = [
             'using system;',
@@ -3951,10 +3952,22 @@ class compile2Csharp:
 
     def genReturn(self, _return):
         if _return.returnValue == VOID:
-            self.write('return;')
+            self.write('\nreturn;')
         else:
-            self.write(f'return {self.genOperationPart(_return.returnValue)};')
+            self.write(f'\nreturn {self.genOperationPart(_return.returnValue)};')
 
+    def genContinue(self):
+        self.write('\ncontinue;')
+
+    def genBreak(self):
+        self.write('\nbreak;')
+    
+    def genForLoop(self, loop):
+        self.write(f'\nfor ({self.genBodyParts(loop.variable)} {self.genOperationPart(loop.condition)}; {self.genBodyParts(loop.steps)})' + '\n{\n')
+        
+        self.write('\n}')
+        return None
+        
     def genOperationPart(self, part):
         res = ''
 
@@ -4026,12 +4039,25 @@ class compile2Csharp:
             self.genVariable(part, True)
             return None
         elif isinstance(part, Function):
-            self.genFunc(part)
+            error = self.genFunc(part)
+            if error:
+                error
             return None
         elif isinstance(part, Return):
             self.genReturn(part)
             return None
-
+        elif isinstance(part, Break):
+            self.genBreak()
+            return None
+        elif isinstance(part, Continue):
+            self.genContinue()
+            return None
+        elif isinstance(part, For):
+            error = self.genForLoop(part)
+            if error:
+                error
+            return None
+        
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
                      Position(-1, -1, -1, '', ''), '<comiler>')
 
@@ -4160,6 +4186,37 @@ class compile2Csharp:
         return None
 
     def genStruct(self, struct):
+        # Checking for class duplication
+        if (struct.name.value in self.structs):
+            return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+        self.structs.append(struct.name.value)
+        
+        self.write(f'\nnamespace {struct.name.value}' + '\n{\n')
+
+        # using
+        for using in struct.externNameSpaces:
+            error = self.genUsing(using)
+            if error:
+                return error
+        self.write('\n')
+
+        self.write(f'\nstruct {struct.name.value}' + '\n{\n')
+
+        # variables
+        for var in struct.variables:
+            error = self.genVariable(var)
+            if error:
+                return error
+
+        # constructors
+        for constructor in struct.constructors:
+            error = self.genConstructor(constructor, struct)
+            if error:
+                return error
+
+        self.write('\n}')
+        self.write('\n}')
         return None
 
     def genConstructor(self, constructor, parent):
