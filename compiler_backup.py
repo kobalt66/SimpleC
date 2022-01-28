@@ -3972,9 +3972,27 @@ class compile2Csharp:
             error = self.genBodyParts(part)
             if error:
                 return error
-
         
         self.write('\n}')
+        return None
+    
+    def genWhileLoop(self, loop):
+        if loop.do:
+            self.write('\ndo \n{\n')
+        else:
+            self.write(f'\nwhile ({self.genOperationPart(loop.condition)})' + '\n{\n')
+            
+        # body
+        for part in loop.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+        
+        if loop.do:
+            self.write('\n}' + f' while ({self.genOperationPart(loop.condition)});')
+        else:
+            self.write('\n}')
+            
         return None
         
     def genOperationPart(self, part):
@@ -4025,7 +4043,7 @@ class compile2Csharp:
 
     def genBodyParts(self, part):
         if isinstance(part, DotAccess):
-            self.write(f'{self.genDotaccess(part)});')
+            self.write(f'{self.genDotaccess(part)};')
             return None
         elif isinstance(part, ArgAccess):
             self.write(f'{part.name}({self.genArgs(part)});')
@@ -4065,6 +4083,9 @@ class compile2Csharp:
             error = self.genForLoop(part)
             if error:
                 error
+            return None
+        elif isinstance(part, While):
+            self.genWhileLoop(part)
             return None
         
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
