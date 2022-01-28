@@ -4087,6 +4087,19 @@ class compile2Csharp:
     def genScript(self, script):
         self.write(f'namespace {script.name}' + '\n{\n')
 
+        # Give necessary information to the compiler
+        for _class in script.global_classes:
+            if (_class.name.value in self.classes):
+                return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+            self.classes.append(_class.name.value)
+            
+        for struct in script.global_structs:
+            if (struct.name.value in self.structs):
+                return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+            self.structs.append(struct.name.value)
+
         # imports
         for imp in script.imports:
             self.write(f'\nusing {imp.value};')
@@ -4143,12 +4156,6 @@ class compile2Csharp:
         return None
 
     def genClass(self, _class):
-        # Checking for class duplication
-        if (_class.name.value in self.classes):
-            return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
-                         Position(-1, -1, -1, '', ''), '<comiler>')
-        self.classes.append(_class.name.value)
-
         attributes = ''
         attributes += 'public ' if _class.public else 'private '
         attributes += 'static ' if _class.static else ''
@@ -4186,12 +4193,6 @@ class compile2Csharp:
         return None
 
     def genStruct(self, struct):
-        # Checking for class duplication
-        if (struct.name.value in self.structs):
-            return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
-                         Position(-1, -1, -1, '', ''), '<comiler>')
-        self.structs.append(struct.name.value)
-        
         self.write(f'\nnamespace {struct.name.value}' + '\n{\n')
 
         # using
@@ -4318,7 +4319,9 @@ class compile2Csharp:
 
         if isinstance(var.value, AccessPoint):
             if isinstance(var.value, ArgAccess):
-                self.write(f' = {var.value.name}({self.genArgs(var.value)});')
+                Var = var.value.name
+                res = Var if not Var in self.classes and not Var in self.structs else f'{Var}.{Var}'
+                self.write(f' = {res}({self.genArgs(var.value)});')
             elif isinstance(var.value, DotAccess):
                 self.write(f' = {self.genDotaccess(var.value)};')
             elif isinstance(var.value, ListAccess):
