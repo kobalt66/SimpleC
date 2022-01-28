@@ -4014,7 +4014,8 @@ class compile2Csharp:
             self.genVariable(part, True)
             return None
         elif isinstance(part, Function):
-            pass
+            self.genFunc(part)
+            return None
         
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
                      Position(-1, -1, -1, '', ''), '<comiler>')
@@ -4133,6 +4134,12 @@ class compile2Csharp:
             if error:
                 return error
 
+        # body
+        for part in _class.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+        
         self.write('\n}')
         self.write('\n}')
         return None
@@ -4170,6 +4177,36 @@ class compile2Csharp:
         return None
 
     def genFunc(self, func):
+        attributes = ''
+        attributes += 'public ' if func.public else 'private '
+        attributes += 'static ' if func.static else ''
+        attributes += 'protected ' if func.protected else ''
+        self.write(f'\n{attributes}{func.returnType.value} {func.name.value}(')
+
+        currIdx = 0
+        maxIdx = len(func.args)
+        for arg in func.args:
+            type = self.convertType2String(arg.type.value)
+            self.write(f'{type} {arg.name.value}')
+
+            currIdx += 1
+            if currIdx < maxIdx:
+                self.write(', ')
+        self.write(')\n{\n')
+
+        # variables
+        for var in func.variables:
+            error = self.genVariable(var, True)
+            if error:
+                return error
+
+        # body
+        for part in func.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+
+        self.write('\n}')
         return None
 
     def genVariable(self, var, inBody=False):
