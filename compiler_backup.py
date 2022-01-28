@@ -4005,8 +4005,10 @@ class compile2Csharp:
             self.write(f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
             return None
         elif isinstance(part, Variable):
-            self.genVariable(part)
+            self.genVariable(part, True)
             return None
+        elif isinstance(part, Function):
+            pass
         
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
                      Position(-1, -1, -1, '', ''), '<comiler>')
@@ -4148,7 +4150,7 @@ class compile2Csharp:
 
         # variables
         for var in constructor.variables:
-            error = self.genVariable(var)
+            error = self.genVariable(var, True)
             if error:
                 return error
 
@@ -4164,10 +4166,11 @@ class compile2Csharp:
     def genFunc(self, func):
         return None
 
-    def genVariable(self, var):
+    def genVariable(self, var, inBody=False):
         # Setup variable
         attributes = ''
-        attributes += 'public ' if var.public else 'private '
+        attributes += 'public ' if var.public and not inBody else ''
+        attributes += 'private ' if not var.public and not inBody else ''
         attributes += 'static ' if var.static else ''
         attributes += 'const' if var.const else ''
         self.write(f'\n{attributes}{self.convertType2String(var.type)} {var.name}')
