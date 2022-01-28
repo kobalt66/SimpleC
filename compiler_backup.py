@@ -3801,7 +3801,7 @@ class compile2Csharp:
 
         # keeping track of names
         self.classes = []
-        
+
         self.basicData = [
             'using system;',
             'using system.Collections;',
@@ -3887,6 +3887,45 @@ class compile2Csharp:
         value += currAccess
 
         return value
+
+    def genBinOp(self, left, op, right):
+        return None
+
+    def convertType2String(self, type):
+        if type == BYT:
+            return 'byte'
+        elif type == FLT:
+            return 'float'
+        elif type == INT:
+            return 'int'
+        elif type == DBL:
+            return 'double'
+        elif type == BOL:
+            return 'bool'
+        elif type == STR:
+            return 'string'
+        elif type == CHR:
+            return 'char'
+        elif type == TYP:
+            return 'Type'
+        else:
+            return 'object'
+
+    def genBodyParts(self, part, tabs):
+        tab = '\t'
+
+        if isinstance(part, DotAccess):
+            self.write(f'{self.genDotaccess(part)})')
+            return None
+        elif isinstance(part, ArgAccess):
+            self.write(f'{part.name}({self.genArgs(part)})')
+            return None
+        elif isinstance(part, BinOpNode):
+            self.genBinOp(part.left, part.op, part.right)
+            return None
+
+        return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2PYERROR,
+                     Position(-1, -1, -1, '', ''), '<comiler>')
 
     def compile(self):
         # Write all the basic data into the script
@@ -3974,20 +4013,20 @@ class compile2Csharp:
         if (_class.name.value in self.classes):
             return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
-        self.classes.append(_class.name.value);
-        
+        self.classes.append(_class.name.value)
+
         attributes = ''
         attributes += 'public ' if _class.public else 'private '
         attributes += 'static ' if _class.static else ''
         self.write(f'\nnamespace {_class.name.value}' + '\n{\n')
-        
+
         # using
         for using in _class.externNameSpaces:
             error = self.genUsing(using)
             if error:
                 return error
         self.write('\n')
-        
+
         self.write(f'\n{attributes}class {_class.name.value}' + '\n{\n')
 
         # variables
@@ -3998,10 +4037,9 @@ class compile2Csharp:
 
         # constructors
         for constructor in _class.constructors:
-            error = self.genConstructor(constructor)
+            error = self.genConstructor(constructor, _class)
             if error:
                 return error
-            
 
         self.write('\n}')
         self.write('\n}')
@@ -4010,12 +4048,32 @@ class compile2Csharp:
     def genStruct(self, struct):
         return None
 
-    def genConstructor(self, constructor):
+    def genConstructor(self, constructor, parent):
+        self.write(f'public {parent.name.value}(')
+
+        currIdx = 0
+        maxIdx = len(constructor.args)
+        for arg in constructor.args:
+            type = self.convertType2String(arg.type.value)
+            self.write(f'{type} {arg.name.value}')
+
+            currIdx += 1
+            if currIdx < maxIdx:
+                self.write(', ')
+        self.write(')\n{\n')
+
+        # variables
+        for var in constructor.variables:
+            error = self.genVariable(var)
+            if error:
+                return error
+
+        self.write('\n}')
         return None
-    
+
     def genFunc(self, func):
         return None
-    
+
     def genVariable(self, var):
         return None
 
