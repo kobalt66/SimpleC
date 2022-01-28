@@ -2268,10 +2268,10 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                else:
-                    body.append(statement)
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                # else:
+                body.append(statement)
                 return res.success(While(None, variables, condition, body, do))
 
             while True:
@@ -2285,10 +2285,10 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                else:
-                    body.append(statement)
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                # else:
+                body.append(statement)
 
             if not self.currTok.type == RCBRACKET:
                 return res.failure(
@@ -2323,10 +2323,10 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                else:
-                    body.append(statement)
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                # else:
+                body.append(statement)
 
             if not self.currTok.type == RCBRACKET:
                 return res.failure(
@@ -2429,10 +2429,10 @@ class Parser:
             if res.error:
                 return res
 
-            if isinstance(statement, Variable):
-                variables.append(statement)
-            else:
-                body.append(statement)
+            # if isinstance(statement, Variable):
+            #     variables.append(statement)
+            # else:
+            body.append(statement)
             return res.success(For(None, variables, variable, condition, steps, body))
 
         while True:
@@ -2446,10 +2446,10 @@ class Parser:
             if res.error:
                 return res
 
-            if isinstance(statement, Variable):
-                variables.append(statement)
-            else:
-                body.append(statement)
+            # if isinstance(statement, Variable):
+            #     variables.append(statement)
+            # else:
+            body.append(statement)
 
         if not self.currTok.type == RCBRACKET:
             return res.failure(
@@ -2499,9 +2499,9 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                elif isinstance(statement, Break) or isinstance(statement, Continue):
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                if isinstance(statement, Break) or isinstance(statement, Continue):
                     return res.failure(
                         Error(
                             "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2520,9 +2520,9 @@ class Parser:
                     if res.error:
                         return res
 
-                    if isinstance(statement, Variable):
-                        variables.append(statement)
-                    elif isinstance(statement, Break) or isinstance(statement, Continue):
+                    # if isinstance(statement, Variable):
+                    #    variables.append(statement)
+                    if isinstance(statement, Break) or isinstance(statement, Continue):
                         return res.failure(
                             Error(
                                 "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2601,9 +2601,9 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                elif isinstance(statement, Break) or isinstance(statement, Continue):
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                if isinstance(statement, Break) or isinstance(statement, Continue):
                     return res.failure(
                         Error(
                             "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2622,9 +2622,9 @@ class Parser:
                     if res.error:
                         return res
 
-                    if isinstance(statement, Variable):
-                        variables.append(statement)
-                    elif isinstance(statement, Break) or isinstance(statement, Continue):
+                    # if isinstance(statement, Variable):
+                    #     variables.append(statement)
+                    if isinstance(statement, Break) or isinstance(statement, Continue):
                         return res.failure(
                             Error(
                                 "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2646,9 +2646,9 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                elif isinstance(statement, Break) or isinstance(statement, Continue):
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                if isinstance(statement, Break) or isinstance(statement, Continue):
                     return res.failure(
                         Error(
                             "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2667,9 +2667,9 @@ class Parser:
                     if res.error:
                         break
 
-                    if isinstance(statement, Variable):
-                        variables.append(statement)
-                    elif isinstance(statement, Break) or isinstance(statement, Continue):
+                    # if isinstance(statement, Variable):
+                    #     variables.append(statement)
+                    if isinstance(statement, Break) or isinstance(statement, Continue):
                         return res.failure(
                             Error(
                                 "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -3967,6 +3967,13 @@ class compile2Csharp:
     def genForLoop(self, loop):
         self.write(f'\nfor ({self.genVariable(loop.variable, True, True)} {self.genOperationPart(loop.condition)}; {self.genReasign(loop.steps.name.varName, loop.steps.op, loop.steps.value)})' + '\n{\n')
         
+        # body
+        for part in loop.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+
+        
         self.write('\n}')
         return None
         
@@ -4345,7 +4352,7 @@ class compile2Csharp:
         if _return:
             return variable
         else:
-            self.write(variable)
+            self.write('\n' + variable)
             
         return None
 
