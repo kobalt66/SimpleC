@@ -3807,9 +3807,11 @@ class compile2Csharp:
         self.structs = []
 
         self.basicData = [
-            'using system;',
-            'using system.Collections;',
-            'using system.Collections.Generic;'
+            'using System;',
+            'using System.Collections;',
+            'using System.Collections.Generic;',
+            ' ',
+            'public const object lengthof = (list) => { return (list as Array).Length; };'
         ]
 
         # Setup output.py
@@ -3963,7 +3965,7 @@ class compile2Csharp:
         self.write('\nbreak;')
     
     def genForLoop(self, loop):
-        self.write(f'\nfor ({self.genBodyParts(loop.variable)} {self.genOperationPart(loop.condition)}; {self.genBodyParts(loop.steps)})' + '\n{\n')
+        self.write(f'\nfor ({self.genVariable(loop.variable, True, True)} {self.genOperationPart(loop.condition)}; {self.genReasign(loop.steps.name.varName, loop.steps.op, loop.steps.value)})' + '\n{\n')
         
         self.write('\n}')
         return None
@@ -4315,7 +4317,6 @@ class compile2Csharp:
             return None
         
         variable = f'{attributes}{self.convertType2String(var.type)} {var.name}'
-        self.write(f'\n{variable}')
 
         if isinstance(var.value, AccessPoint):
             if isinstance(var.value, ArgAccess):
