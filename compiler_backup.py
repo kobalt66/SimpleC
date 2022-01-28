@@ -3853,9 +3853,12 @@ class compile2Csharp:
     def genArgs(self, var):
         value = ''
 
+        currIdx = 0
+        maxIdx = len(var.args)
         for arg in var.args:
+            currIdx += 1
             if isinstance(arg, VarAccess):
-                value += f'{arg.varName.value},'
+                value += f'{arg.varName.value}'
             elif isinstance(arg, DotAccess):
                 currAccess = arg
                 while isinstance(currAccess, DotAccess) and currAccess.parent.value:
@@ -3867,14 +3870,17 @@ class compile2Csharp:
                         currAccess = currAccess.var.varName.value
                 value += '.'
                 value += currAccess
-                value += ','
             else:
                 if isinstance(arg, String):
-                    value += f'\'{arg.value.value}\','
+                    value += f'\'{arg.value.value}\''
                 elif isinstance(arg, Bool):
-                    value += f'{str(arg.value.value).capitalize()},'
+                    value += f'{str(arg.value.value).capitalize()}'
                 else:
-                    value += f'{arg.value.value},'
+                    value += f'{arg.value.value}'
+
+            if currIdx < maxIdx:
+                value += ', '
+            
         return value
 
     def genArgAccess(self, access):
@@ -3997,6 +4003,9 @@ class compile2Csharp:
             pass
         elif isinstance(part, ReasignVar):
             self.write(f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
+            return None
+        elif isinstance(part, Variable):
+            self.genVariable(part)
             return None
         
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
@@ -4124,7 +4133,7 @@ class compile2Csharp:
         return None
 
     def genConstructor(self, constructor, parent):
-        self.write(f'public {parent.name.value}(')
+        self.write(f'\npublic {parent.name.value}(')
 
         currIdx = 0
         maxIdx = len(constructor.args)
@@ -4156,6 +4165,35 @@ class compile2Csharp:
         return None
 
     def genVariable(self, var):
+        # Setup variable
+        attributes = ''
+        attributes += 'public ' if var.public else 'private '
+        attributes += 'static ' if var.static else ''
+        attributes += 'const' if var.const else ''
+        self.write(f'\n{attributes}{self.convertType2String(var.type)} {var.name}')
+        
+        if isinstance(var.value, AccessPoint):
+            if isinstance(var.value, ArgAccess):
+                self.write(f' = {var.value.name}({self.genArgs(var.value)});')
+            elif isinstance(var.value, DotAccess):
+                self.write(f' = {self.genDotaccess(var.value)};')
+            elif isinstance(var.value, ListAccess):
+                pass
+            elif isinstance(var.value, VarAccess):
+                self.write(f' = {var.value.varName.value};')
+        else:
+            if var.value:
+                if isinstance(var.value, String):
+                    self.write(f' = {self.genString(var.value)};')
+                elif isinstance(var.value, Number):
+                    self.write(f' = {self.genNumber(var.value)};')
+                elif isinstance(var.value, str):
+                    self.write(f' = {var.value};')
+                else:
+                    self.write(f' = {var.value.value.value};')
+            else:
+                self.write(';')
+                
         return None
 
 
