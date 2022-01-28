@@ -217,6 +217,7 @@ EXPEXTEDCHAR = 'ExpectedChar'
 PARSEERROR = 'ParseError'
 SYNTAXERROR = 'SyntaxError'
 COMP2PYERROR = 'copmile2python < Error >'
+COMP2CSHARPERROR = 'compile2csharp < Error >'
 DIVBYZERO = 'DivisionByZero'
 PYTHON_EXCEPTION = 'Python Exception'
 # ... (more in the future)
@@ -3319,10 +3320,10 @@ class compile2python:
         else:
             f = open(self.outputFile, 'x')
             f.close()
-    
+
     def genHexCode(self):
         return '{0:032x}'.format(random.randrange(16**32))
-    
+
     def getPath(self, name):
         for path in self.pathData:
             if path.compare(name):
@@ -3688,7 +3689,8 @@ class compile2python:
         self.write(listStr)
 
         # generate constructor function
-        self.write(f'\n{tab * tabs}if True == [{list}[x].arg.compareType(args[x]) for x in range(len(list))]:')
+        self.write(
+            f'\n{tab * tabs}if True == [{list}[x].arg.compareType(args[x]) for x in range(len(list))]:')
 
         if len(const.variables) > 0 or len(const.body) > 0:
             # variables
@@ -3709,7 +3711,7 @@ class compile2python:
                     return error
         else:
             self.write(f'\n{tab * tabs}\tpass')
-            
+
         return None
 
     def function(self, func, parentPath):
@@ -3727,14 +3729,13 @@ class compile2python:
             return None
         elif isinstance(part, BinOpNode):
             self.genBinOp(part.left, part.op, part.right)
-        
+
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2PYERROR,
-                    Position(-1, -1, -1, '', ''), '<comiler>')
-    
+                     Position(-1, -1, -1, '', ''), '<comiler>')
+
     def genBinOp(self, left, op, right):
         tab = '\t'
-        
-    
+
     def genVariable(self, var, tabs, parentPath):
         tab = '\t'
         if parentPath:
@@ -3797,11 +3798,13 @@ class compile2Csharp:
         self.defaultLib = 'libDEFAULTlib'
         self.noneStr = 'None'
         self.outputFile = f'{self.outputdir}output.cs'
-        
-        self.basicData = [ 
-        
+
+        self.basicData = [
+            'using system;',
+            'using system.Collections;',
+            'using system.Collections.Generic;'
         ]
-        
+
         # Setup output.py
         if os.path.exists(self.outputFile):
             f = open(self.outputFile, 'w')
@@ -3810,7 +3813,7 @@ class compile2Csharp:
         else:
             f = open(self.outputFile, 'x')
             f.close()
-        
+
     def write(self, data, print=False):
         f = open(self.outputFile, 'a')
         f.write(data)
@@ -3821,33 +3824,182 @@ class compile2Csharp:
             f = open(self.outputFile, 'r')
             print(f.read())
             f.close()
-        
+
+    def genUsing(self, using, tabs):
+        tab = '\t'
+
+        if isinstance(using.name, VarAccess):
+            self.write(
+                f'\n{tab * tabs}self.{using.name.varName.value.capitalize()} = @!VM!@.{using.name.varName.value}()')
+        elif isinstance(using.name, DotAccess):
+            dotAccess, lastNamespace = self.genDotaccess(using.name, True)
+            self.write(
+                f'using {dotAccess};')
+        else:
+            return Error(f'You can only use a varaccess point inside a using expression.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+
+        return None
+
+    def genArgs(self, var):
+        value = ''
+
+        for arg in var.args:
+            if isinstance(arg, VarAccess):
+                value += f'{arg.varName.value},'
+            elif isinstance(arg, DotAccess):
+                currAccess = arg
+                while isinstance(currAccess, DotAccess) and currAccess.parent.value:
+                    value += '.'
+                    value += currAccess.parent.value
+                    if currAccess.node:
+                        currAccess = currAccess.node
+                    else:
+                        currAccess = currAccess.var.varName.value
+                value += '.'
+                value += currAccess
+                value += ','
+            else:
+                if isinstance(arg, String):
+                    value += f'\'{arg.value.value}\','
+                elif isinstance(arg, Bool):
+                    value += f'{str(arg.value.value).capitalize()},'
+                else:
+                    value += f'{arg.value.value},'
+        return value
+
+    def genDotaccess(self, var, returnLast=False):
+        value = ''
+
+        currAccess = var
+        while isinstance(currAccess, DotAccess) and currAccess.parent.value:
+            value += '.'
+            value += currAccess.parent.value
+            if currAccess.node:
+                currAccess = currAccess.node
+                if isinstance(currAccess, ArgAccess):
+                    argAccess = self.genArgaccess(currAccess)
+                    value += '.' + argAccess
+                    return value
+            else:
+                currAccess = currAccess.var.varName.value
+        value += '.'
+        value += currAccess
+
+        if returnLast:
+            return value, currAccess
+        return value
+
+
     def compile(self):
         # Write all the basic data into the script
         for data in self.basicData:
             self.write(data)
             self.write('\n')
-        self.write('\n' + '#' * 200)
+        self.write('\n' + '/' * 200)
 
         # Start with libs
         for lib in self.ms.libs:
-            mPath = lib.name
-            self.pathData.append(compPath(lib.name, lib.name))
-
             self.write('\n\n')
             self.write(
-                f'class {lib.name}:\n\tdef __init__(self):\n\t\tself.type = LIB')
+                f'namespace {lib.name} ' + '\n{\n')
 
             # Generate all script classes
             for script in lib.scripts:
-                error = self.genScript(script, mPath)
+                error = self.genScript(script)
                 if error:
                     return error
-            self.write('\n\n')
+            self.write('\n}\n')
 
         print('Successfully compiled the project!')
-        return None 
-        
+        return None
+
+    def genScript(self, script):
+        self.write(f'namespace {script.name}' + '\n{\n')
+
+        # imports
+        for imp in script.imports:
+            self.write(f'\nusing {imp.value};')
+
+        # global_variables
+        for var in script.global_variables:
+            error = self.genVariable(var)
+            if error:
+                return error
+
+        # namespaces
+        for namespace in script.namespaces:
+            error = self.genNamespace(namespace)
+            if error:
+                return error
+
+        # classes
+        for _class in script.global_classes:
+            error = self.genClass(_class)
+            if error:
+                return error
+
+        # structs
+        for struct in script.global_structs:
+            error = self.genStruct(struct)
+            if error:
+                return error
+
+        self.write('\n}')
+        return None
+    
+    def genNamespace(self, namespace):
+        self.write(f'\nnamespace {namespace.name.value}' + '\n{\n')
+
+        # child namespaces
+        for childNamespace in namespace.childSpaces:
+            error = self.genNamespace(childNamespace)
+            if error:
+                return error
+
+        # classes
+        for _class in namespace.classes:
+            error = self.genClass(_class)
+            if error:
+                return error
+
+        # structs
+        for struct in namespace.structs:
+            error = self.genStruct(struct)
+            if error:
+                return error
+
+        self.write('\n}')
+        return None
+
+    def genClass(self, _class):
+        self.write(
+            f'class {_class.name}' + '\n{\n')
+
+        # using
+        for using in _class.externNameSpaces:
+            error = self.genUsing(using)
+            if error:
+                return error
+        self.write('\n')
+
+        # variables
+        for var in _class.variables:
+            error = self.genVariable(var)
+            if error:
+                return error
+
+        # constructors
+
+        self.write('\n}')
+        return None
+
+    def genStruct(self, struct):
+        return None
+
+    def genVariable(self, var):
+        return None
+
 
 ####################
 # - Run Function - #
@@ -3878,9 +4030,9 @@ def run(fn, text):
     error = compiler.compile()
     if error:
         return error
-    
+
     # That's something for compile2python:
-    #compiler.checkPaths()
+    # compiler.checkPaths()
 
     return None
 
