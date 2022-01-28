@@ -3869,26 +3869,55 @@ class compile2Csharp:
                     value += f'{arg.value.value},'
         return value
 
+    def genArgAccess(self, access):
+        res = f'{access.name}('
+        
+        currIdx = 0
+        maxIdx = len(access.args)
+        for param in access.args:
+            if isinstance(param, Number):
+                res += str(param.value.value)
+                res += 'f' if param.type == FLT else ''
+            elif isinstance(param, String):
+                res += f'"{param.value.value}"' if len(param.value.value) > 1 else f'\'{param.value.value}\''
+            elif isinstance(param, VarAccess):
+                res += param.varName.value
+            elif isinstance(param, DotAccess):
+                res += self.genDotaccess(param)
+            else:
+                res += param.value.value
+            
+            currIdx += 1;
+            if currIdx < maxIdx:
+                res += ', '
+                
+        return res
+    
     def genDotaccess(self, var):
         value = ''
 
+        currIdx = 0
         currAccess = var
         while isinstance(currAccess, DotAccess) and currAccess.parent.value:
+            value += '.' if currIdx > 0 else ''
+            currIdx += 1
+            
             value += currAccess.parent.value
             if currAccess.node:
                 currAccess = currAccess.node
                 if isinstance(currAccess, ArgAccess):
-                    argAccess = self.genArgaccess(currAccess)
+                    argAccess = self.genArgAccess(currAccess)
                     value += '.' + argAccess
                     return value
             else:
-                currAccess = currAccess.var.varName.value
+                currAccess = currAccess.var.varName.value    
         value += '.'
         value += currAccess
 
         return value
-
+    
     def genBinOp(self, left, op, right):
+        
         return None
 
     def convertType2String(self, type):
@@ -3911,20 +3940,18 @@ class compile2Csharp:
         else:
             return 'object'
 
-    def genBodyParts(self, part, tabs):
-        tab = '\t'
-
+    def genBodyParts(self, part):
         if isinstance(part, DotAccess):
-            self.write(f'{self.genDotaccess(part)})')
+            self.write(f'{self.genDotaccess(part)});')
             return None
         elif isinstance(part, ArgAccess):
-            self.write(f'{part.name}({self.genArgs(part)})')
+            self.write(f'{part.name}({self.genArgs(part)});')
             return None
         elif isinstance(part, BinOpNode):
             self.genBinOp(part.left, part.op, part.right)
             return None
 
-        return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2PYERROR,
+        return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
                      Position(-1, -1, -1, '', ''), '<comiler>')
 
     def compile(self):
@@ -4065,6 +4092,12 @@ class compile2Csharp:
         # variables
         for var in constructor.variables:
             error = self.genVariable(var)
+            if error:
+                return error
+
+        # body
+        for part in constructor.body:
+            error = self.genBodyParts(part)
             if error:
                 return error
 
