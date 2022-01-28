@@ -3799,6 +3799,9 @@ class compile2Csharp:
         self.noneStr = 'None'
         self.outputFile = f'{self.outputdir}output.cs'
 
+        # keeping track of names
+        self.classes = []
+        
         self.basicData = [
             'using system;',
             'using system.Collections;',
@@ -3825,14 +3828,12 @@ class compile2Csharp:
             print(f.read())
             f.close()
 
-    def genUsing(self, using, tabs):
-        tab = '\t'
-
+    def genUsing(self, using):
         if isinstance(using.name, VarAccess):
             self.write(
-                f'\n{tab * tabs}self.{using.name.varName.value.capitalize()} = @!VM!@.{using.name.varName.value}()')
+                f'using {using.name.varName.value};')
         elif isinstance(using.name, DotAccess):
-            dotAccess, lastNamespace = self.genDotaccess(using.name, True)
+            dotAccess = self.genDotaccess(using.name)
             self.write(
                 f'using {dotAccess};')
         else:
@@ -3868,12 +3869,11 @@ class compile2Csharp:
                     value += f'{arg.value.value},'
         return value
 
-    def genDotaccess(self, var, returnLast=False):
+    def genDotaccess(self, var):
         value = ''
 
         currAccess = var
         while isinstance(currAccess, DotAccess) and currAccess.parent.value:
-            value += '.'
             value += currAccess.parent.value
             if currAccess.node:
                 currAccess = currAccess.node
@@ -3886,10 +3886,7 @@ class compile2Csharp:
         value += '.'
         value += currAccess
 
-        if returnLast:
-            return value, currAccess
         return value
-
 
     def compile(self):
         # Write all the basic data into the script
@@ -3947,7 +3944,7 @@ class compile2Csharp:
 
         self.write('\n}')
         return None
-    
+
     def genNamespace(self, namespace):
         self.write(f'\nnamespace {namespace.name.value}' + '\n{\n')
 
@@ -3973,15 +3970,25 @@ class compile2Csharp:
         return None
 
     def genClass(self, _class):
-        self.write(
-            f'class {_class.name}' + '\n{\n')
-
+        # Checking for class duplication
+        if (_class.name.value in self.classes):
+            return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+        self.classes.append(_class.name.value);
+        
+        attributes = ''
+        attributes += 'public ' if _class.public else 'private '
+        attributes += 'static ' if _class.static else ''
+        self.write(f'\nnamespace {_class.name.value}' + '\n{\n')
+        
         # using
         for using in _class.externNameSpaces:
             error = self.genUsing(using)
             if error:
                 return error
         self.write('\n')
+        
+        self.write(f'\n{attributes}class {_class.name.value}' + '\n{\n')
 
         # variables
         for var in _class.variables:
@@ -3990,13 +3997,25 @@ class compile2Csharp:
                 return error
 
         # constructors
+        for constructor in _class.constructors:
+            error = self.genConstructor(constructor)
+            if error:
+                return error
+            
 
+        self.write('\n}')
         self.write('\n}')
         return None
 
     def genStruct(self, struct):
         return None
 
+    def genConstructor(self, constructor):
+        return None
+    
+    def genFunc(self, func):
+        return None
+    
     def genVariable(self, var):
         return None
 
