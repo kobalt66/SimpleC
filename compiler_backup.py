@@ -344,55 +344,55 @@ class Lexer:
                     return [], error
                 tokens.append(token)
             elif self.currChar == ENDCOLUMN:            # ;
-                tokens.append(Token(ENDCOLUMN, start=self.pos))
+                tokens.append(Token(ENDCOLUMN, ENDCOLUMN, start=self.pos))
                 self.advance()
             elif self.currChar == LCBRACKET:            # {
-                tokens.append(Token(LCBRACKET, start=self.pos))
+                tokens.append(Token(LCBRACKET, LCBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == RCBRACKET:            # }
-                tokens.append(Token(RCBRACKET, start=self.pos))
+                tokens.append(Token(RCBRACKET, RCBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == LSBRACKET:            # [
-                tokens.append(Token(LSBRACKET, start=self.pos))
+                tokens.append(Token(LSBRACKET, LSBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == RSBRACKET:            # ]
-                tokens.append(Token(RSBRACKET, start=self.pos))
+                tokens.append(Token(RSBRACKET, RSBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == LBRACKET:             # (
-                tokens.append(Token(LBRACKET, start=self.pos))
+                tokens.append(Token(LBRACKET, LBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == RBRACKET:             # )
-                tokens.append(Token(RBRACKET, start=self.pos))
+                tokens.append(Token(RBRACKET, RBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == POWER:                # ^
-                tokens.append(Token(POWER, start=self.pos))
+                tokens.append(Token(POWER, POWER, start=self.pos))
                 self.advance()
             elif self.currChar == EQUALS:               # =
-                tokens.append(Token(EQUALS, start=self.pos))
+                tokens.append(Token(EQUALS, EQUALS, start=self.pos))
                 self.advance()
             elif self.currChar == ISEQUALTO:            # ?
-                tokens.append(Token(ISEQUALTO, start=self.pos))
+                tokens.append(Token(ISEQUALTO, ISEQUALTO, start=self.pos))
                 self.advance()
             elif self.currChar == NOT:                  # !
-                tokens.append(Token(NOT, start=self.pos))
+                tokens.append(Token(NOT, NOT, start=self.pos))
                 self.advance()
             elif self.currChar == MODULUS:              # %
-                tokens.append(Token(MODULUS, start=self.pos))
+                tokens.append(Token(MODULUS, MODULUS, start=self.pos))
                 self.advance()
             elif self.currChar == COMMA:                # ,
-                tokens.append(Token(COMMA, start=self.pos))
+                tokens.append(Token(COMMA, COMMA, start=self.pos))
                 self.advance()
             elif self.currChar == DOT:                  # .
-                tokens.append(Token(DOT, start=self.pos))
+                tokens.append(Token(DOT, DOT, start=self.pos))
                 self.advance()
             elif self.currChar == COLON:                # :
-                tokens.append(Token(COLON, start=self.pos))
+                tokens.append(Token(COLON, COLON, start=self.pos))
                 self.advance()
             elif self.currChar == AND:                  # &
-                tokens.append(Token(AND, start=self.pos))
+                tokens.append(Token(AND, AND, start=self.pos))
                 self.advance()
             elif self.currChar == OR:                   # |
-                tokens.append(Token(OR, start=self.pos))
+                tokens.append(Token(OR, OR, start=self.pos))
                 self.advance()
             else:                                       # Error if nothing is true
                 self.advance()
@@ -3154,7 +3154,7 @@ class Parser:
             return res.success(UnaryNode(op_tok, node))
 
         node = res.register(self.bin_op(
-            self.arith_expr, (ISEQUALTO, NOT, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
+            self.arith_expr, (EQUALS, ISEQUALTO, NOT, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
         if res.error:
             return res
 
@@ -3927,13 +3927,17 @@ class compile2Csharp:
         pass
     
     def genUnaryOp(self, op, node):
-        return f'{op}{self.genOperationPart(node)}'
+        return f'{op.value}{self.genOperationPart(node)}'
     
     def genBinOp(self, left, op, right):
         return f'{self.genOperationPart(left)} {op.value} {self.genOperationPart(right)}'  
     
     def genReasign(self, name, op, value):
-        return f'{name} {op} {self.genOperationPart(value)}'
+        if op.value == PLUSPLUS:
+            return f'{name}++'
+        elif op.value == MINUSMINUS:
+            return f'{name}--'
+        return f'{name} {op.value} {self.genOperationPart(value)}'
     
     def genOperationPart(self, part):
         res = ''
@@ -3987,12 +3991,12 @@ class compile2Csharp:
             self.write(f'{part.name}({self.genArgs(part)});')
             return None
         elif isinstance(part, BinOpNode):
-            self.write(f'{self.genBinOp(part.left, part.op, part.right)};')
+            self.write(f'\n{self.genBinOp(part.left, part.op, part.right)};')
             return None
         elif isinstance(part, List):
             pass
         elif isinstance(part, ReasignVar):
-            self.write(f'{self.genReasign(part.name.varName, part.op, part.value)};')
+            self.write(f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
             return None
         
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
