@@ -1825,8 +1825,7 @@ class Parser:
                             "Expected ')'.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
 
-                body.append(Variable(None, None, None, False, False,
-                            False, type, varName, valueVarName))
+                body.append(ReasignVar(varName, Token(EQUALS, EQUALS), valueVarName))
                 res.registerAdvance()
                 self.advance()
 
@@ -3964,6 +3963,8 @@ class compile2Csharp:
             res = f'({self.genBinOp(part.left, part.op, part.right)})'
         elif isinstance(part, UnaryNode):
             res = self.genUnaryOp(part.op, part.node)
+        elif isinstance(part, str):
+            res = part
         else:
             res = part.value.value
         
@@ -4002,7 +4003,10 @@ class compile2Csharp:
         elif isinstance(part, List):
             pass
         elif isinstance(part, ReasignVar):
-            self.write(f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
+            if isinstance(part.name, str):
+                self.write(f'\n{self.genReasign(part.name, part.op, part.value)};')
+            else:
+                self.write(f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
             return None
         elif isinstance(part, Variable):
             self.genVariable(part, True)
@@ -4172,7 +4176,7 @@ class compile2Csharp:
         attributes += 'public ' if var.public and not inBody else ''
         attributes += 'private ' if not var.public and not inBody else ''
         attributes += 'static ' if var.static else ''
-        attributes += 'const' if var.const else ''
+        attributes += 'const ' if var.const else ''
         self.write(f'\n{attributes}{self.convertType2String(var.type)} {var.name}')
         
         if isinstance(var.value, AccessPoint):
