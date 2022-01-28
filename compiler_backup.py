@@ -3786,6 +3786,69 @@ class compile2python:
                         f'\n{tab * tabs}self.{var.name}.equals({var.value.value.value})')
         return None
 
+
+class compile2Csharp:
+    def __init__(self, masterscript, outputdir, projectdir):
+        self.outputdir = outputdir
+        self.projectdir = projectdir
+
+        # compiler stuff
+        self.ms = masterscript
+        self.defaultLib = 'libDEFAULTlib'
+        self.noneStr = 'None'
+        self.outputFile = f'{self.outputdir}output.cs'
+        
+        self.basicData = [ 
+        
+        ]
+        
+        # Setup output.py
+        if os.path.exists(self.outputFile):
+            f = open(self.outputFile, 'w')
+            f.write('// This is the compiled script of your project.\n\n')
+            f.close()
+        else:
+            f = open(self.outputFile, 'x')
+            f.close()
+        
+    def write(self, data, print=False):
+        f = open(self.outputFile, 'a')
+        f.write(data)
+        f.close()
+
+        # Open and read the file after the appending
+        if print:
+            f = open(self.outputFile, 'r')
+            print(f.read())
+            f.close()
+        
+    def compile(self):
+        # Write all the basic data into the script
+        for data in self.basicData:
+            self.write(data)
+            self.write('\n')
+        self.write('\n' + '#' * 200)
+
+        # Start with libs
+        for lib in self.ms.libs:
+            mPath = lib.name
+            self.pathData.append(compPath(lib.name, lib.name))
+
+            self.write('\n\n')
+            self.write(
+                f'class {lib.name}:\n\tdef __init__(self):\n\t\tself.type = LIB')
+
+            # Generate all script classes
+            for script in lib.scripts:
+                error = self.genScript(script, mPath)
+                if error:
+                    return error
+            self.write('\n\n')
+
+        print('Successfully compiled the project!')
+        return None 
+        
+
 ####################
 # - Run Function - #
 ####################
@@ -3810,11 +3873,14 @@ def run(fn, text):
         return ast.error
 
     # Compiling
-    compiler = compile2python(masterscript, outputdir, projectdir)
+    #compiler = compile2python(masterscript, outputdir, projectdir)
+    compiler = compile2Csharp(masterscript, outputdir, projectdir)
     error = compiler.compile()
     if error:
         return error
-    compiler.checkPaths()
+    
+    # That's something for compile2python:
+    #compiler.checkPaths()
 
     return None
 
