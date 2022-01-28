@@ -4282,7 +4282,7 @@ class compile2Csharp:
         self.write('\n}')
         return None
 
-    def genVariable(self, var, inBody=False):
+    def genVariable(self, var, inBody=False, _return=False):
         # Setup variable
         attributes = ''
         attributes += 'public ' if var.public and not inBody else ''
@@ -4313,34 +4313,39 @@ class compile2Csharp:
                 print('Other list value type! Unexpected!!!!')
 
             return None
-
-        self.write(
-            f'\n{attributes}{self.convertType2String(var.type)} {var.name}')
+        
+        variable = f'{attributes}{self.convertType2String(var.type)} {var.name}'
+        self.write(f'\n{variable}')
 
         if isinstance(var.value, AccessPoint):
             if isinstance(var.value, ArgAccess):
                 Var = var.value.name
                 res = Var if not Var in self.classes and not Var in self.structs else f'{Var}.{Var}'
-                self.write(f' = {res}({self.genArgs(var.value)});')
+                variable += f' = {res}({self.genArgs(var.value)});';
             elif isinstance(var.value, DotAccess):
-                self.write(f' = {self.genDotaccess(var.value)};')
+                variable += f' = {self.genDotaccess(var.value)};'
             elif isinstance(var.value, ListAccess):
-                self.write(f' = {self.genListAccess(var.value)};')
+                variable += f' = {self.genListAccess(var.value)};'
             elif isinstance(var.value, VarAccess):
-                self.write(f' = {var.value.varName.value};')
+                variable += f' = {var.value.varName.value};'
         else:
             if var.value:
                 if isinstance(var.value, String):
-                    self.write(f' = {self.genString(var.value)};')
+                    variable += f' = {self.genString(var.value)};'
                 elif isinstance(var.value, Number):
-                    self.write(f' = {self.genNumber(var.value)};')
+                    variable += f' = {self.genNumber(var.value)};'
                 elif isinstance(var.value, str):
-                    self.write(f' = {var.value};')
+                    variable += f' = {var.value};'
                 else:
-                    self.write(f' = {var.value.value.value};')
+                    variable += f' = {var.value.value.value};'
             else:
-                self.write(';')
+                variable += ';'
 
+        if _return:
+            return variable
+        else:
+            self.write(variable)
+            
         return None
 
 ####################
