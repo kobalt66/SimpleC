@@ -801,6 +801,9 @@ class ListAccess(AccessPoint):
     def __repr__(self):
         return f'\n\tListAccess Node: \n\t\tList name > {self.name}\n\t\tIndex > {self.elementIdx}'
 
+    def getType(self):
+        return LIA
+
 
 class List:
     def __init__(self, lib, namespace, classNode, public, static, const, type, name, elements, start, end):
@@ -1825,7 +1828,8 @@ class Parser:
                             "Expected ')'.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
 
-                body.append(ReasignVar(varName, Token(EQUALS, EQUALS), valueVarName))
+                body.append(ReasignVar(varName, Token(
+                    EQUALS, EQUALS), valueVarName))
                 res.registerAdvance()
                 self.advance()
 
@@ -3843,12 +3847,12 @@ class compile2Csharp:
 
     def genString(self, var):
         return f'"{var.value.value}"' if len(var.value.value) > 1 else f'\'{var.value.value}\''
-    
+
     def genNumber(self, var):
         res = str(var.value.value)
         res += 'f' if var.type == FLT else ''
         return res
-    
+
     def genArgs(self, var):
         value = ''
 
@@ -3879,12 +3883,12 @@ class compile2Csharp:
 
             if currIdx < maxIdx:
                 value += ', '
-            
+
         return value
 
     def genArgAccess(self, access):
         res = f'{access.name}('
-        
+
         currIdx = 0
         maxIdx = len(access.args)
         for param in access.args:
@@ -3898,14 +3902,14 @@ class compile2Csharp:
                 res += self.genDotaccess(param)
             else:
                 res += param.value.value
-            
-            currIdx += 1;
+
+            currIdx += 1
             if currIdx < maxIdx:
                 res += ', '
-        
+
         res += ')'
         return res
-    
+
     def genDotaccess(self, var):
         value = ''
 
@@ -3914,7 +3918,7 @@ class compile2Csharp:
         while isinstance(currAccess, DotAccess) and currAccess.parent.value:
             value += '.' if currIdx > 0 else ''
             currIdx += 1
-            
+
             value += currAccess.parent.value
             if currAccess.node:
                 currAccess = currAccess.node
@@ -3923,31 +3927,37 @@ class compile2Csharp:
                     value += '.' + argAccess
                     return value
             else:
-                currAccess = currAccess.var.varName.value    
+                currAccess = currAccess.var.varName.value
         value += '.'
         value += currAccess
 
         return value
-    
+
     def genListAccess(self, var):
         return f'{var.name}[{var.elementIdx.value}]'
-    
+
     def genUnaryOp(self, op, node):
         return f'{op.value}{self.genOperationPart(node)}'
-    
+
     def genBinOp(self, left, op, right):
-        return f'{self.genOperationPart(left)} {op.value} {self.genOperationPart(right)}'  
-    
+        return f'{self.genOperationPart(left)} {op.value} {self.genOperationPart(right)}'
+
     def genReasign(self, name, op, value):
         if op.value == PLUSPLUS:
             return f'{name}++'
         elif op.value == MINUSMINUS:
             return f'{name}--'
         return f'{name} {op.value} {self.genOperationPart(value)}'
-    
+
+    def genReturn(self, _return):
+        if _return.returnValue == VOID:
+            self.write('return;')
+        else:
+            self.write(f'return {self.genOperationPart(_return.returnValue)};')
+
     def genOperationPart(self, part):
         res = ''
-        
+
         if isinstance(part, DotAccess):
             res = self.genDotaccess(part)
         elif isinstance(part, ArgAccess):
@@ -3968,7 +3978,7 @@ class compile2Csharp:
             res = part
         else:
             res = part.value.value
-        
+
         return res
 
     def convertType2String(self, type):
@@ -4006,9 +4016,11 @@ class compile2Csharp:
             return None
         elif isinstance(part, ReasignVar):
             if isinstance(part.name, str):
-                self.write(f'\n{self.genReasign(part.name, part.op, part.value)};')
+                self.write(
+                    f'\n{self.genReasign(part.name, part.op, part.value)};')
             else:
-                self.write(f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
+                self.write(
+                    f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
             return None
         elif isinstance(part, Variable):
             self.genVariable(part, True)
@@ -4016,7 +4028,10 @@ class compile2Csharp:
         elif isinstance(part, Function):
             self.genFunc(part)
             return None
-        
+        elif isinstance(part, Return):
+            self.genReturn(part)
+            return None
+
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
                      Position(-1, -1, -1, '', ''), '<comiler>')
 
@@ -4139,7 +4154,7 @@ class compile2Csharp:
             error = self.genBodyParts(part)
             if error:
                 return error
-        
+
         self.write('\n}')
         self.write('\n}')
         return None
@@ -4217,31 +4232,33 @@ class compile2Csharp:
         attributes += 'static ' if var.static else ''
         attributes += 'const ' if var.const else ''
         if isinstance(var, List):
-            self.write(f'\n{attributes}{self.convertType2String(var.type)}[] {var.name}')
-            
+            self.write(
+                f'\n{attributes}{self.convertType2String(var.type)}[] {var.name}')
+
             if isinstance(var.elements, ListSpace):
                 if not var.elements.elements == None:
                     self.write(' = {')
-                    
+
                     currIdx = 0
                     maxIdx = len(var.elements.elements)
                     for e in var.elements.elements:
                         currIdx += 1
-                        
+
                         self.write(f' {self.genOperationPart(e)}')
                         if currIdx < maxIdx:
                             self.write(',')
-                            
-                    self.write(' };') 
+
+                    self.write(' };')
                 else:
                     self.write(f' = new {var.type}[{var.elements.length}];')
             else:
                 print('Other list value type! Unexpected!!!!')
-            
+
             return None
-        
-        self.write(f'\n{attributes}{self.convertType2String(var.type)} {var.name}')
-        
+
+        self.write(
+            f'\n{attributes}{self.convertType2String(var.type)} {var.name}')
+
         if isinstance(var.value, AccessPoint):
             if isinstance(var.value, ArgAccess):
                 self.write(f' = {var.value.name}({self.genArgs(var.value)});')
@@ -4263,7 +4280,7 @@ class compile2Csharp:
                     self.write(f' = {var.value.value.value};')
             else:
                 self.write(';')
-                
+
         return None
 
 ####################
