@@ -3930,7 +3930,7 @@ class compile2Csharp:
         return value
     
     def genListAccess(self, var):
-        pass
+        return f'{var.name}[{var.elementIdx.value}]'
     
     def genUnaryOp(self, op, node):
         return f'{op.value}{self.genOperationPart(node)}'
@@ -4211,7 +4211,7 @@ class compile2Csharp:
             elif isinstance(var.value, DotAccess):
                 self.write(f' = {self.genDotaccess(var.value)};')
             elif isinstance(var.value, ListAccess):
-                pass
+                self.write(f' = {self.genListAccess(var.value)};')
             elif isinstance(var.value, VarAccess):
                 self.write(f' = {var.value.varName.value};')
         else:
