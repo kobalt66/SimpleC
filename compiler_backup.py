@@ -2758,6 +2758,13 @@ class Parser:
             self.advance()
 
             if not self.currTok.type == INT:
+                if self.currTok.type == RSBRACKET:
+                   self.reverse(2)
+                   var = res.register(self.defVar())
+                   if res.error:
+                       return res
+                   
+                   return res.success(var)
                 if not self.currTok.type == IDENTIFIER:
                     return res.failure(
                         Error(
@@ -2889,12 +2896,7 @@ class Parser:
             value = res.register(self.listElements())
             if res.error:
                 return res
-
-            if type == VAR and isinstance(value, ListSpace):
-                type = value.elements[0].getType()
-                if type == AGA:
-                    type = value.elements[0].name
-            
+                        
             return res.success(List(None, None, None, False, False, False, type, name, value, self.currTok.start, self.currTok.end))
 
         if not self.currTok.type == IDENTIFIER:
