@@ -3792,6 +3792,14 @@ class compile2python:
                         f'\n{tab * tabs}self.{var.name}.equals({var.value.value.value})')
         return None
 
+################################################################################################################################################################################
+
+class constant:
+    def __init__(self, lib, name, type, value):
+        self.lib = lib
+        self.name = name
+        self.type = type
+        self.value = value
 
 class compile2Csharp:
     def __init__(self, masterscript, outputdir, projectdir):
@@ -3807,13 +3815,12 @@ class compile2Csharp:
         # keeping track of names
         self.classes = []
         self.structs = []
+        self.constants = []
 
         self.basicData = [
             'using System;',
             'using System.Collections;',
             'using System.Collections.Generic;',
-            ' ',
-            'public const object lengthof = (list) => { return (list as Array).Length; };'
         ]
 
         # Setup output.py
@@ -4159,6 +4166,12 @@ class compile2Csharp:
                     return error
             self.write('\n}\n')
 
+        # Generating the global class
+        self.write(f'\npublic static class ___Global___' + '\n{\n')
+        for const in self.constants:
+            self.write(f'\npublic static {const.type} {const.lib}_{const.name} = {const.value};')
+        self.write('\n}')
+        
         print('Successfully compiled the project!')
         return None
 
@@ -4184,9 +4197,7 @@ class compile2Csharp:
 
         # global_variables
         for var in script.global_variables:
-            error = self.genVariable(var)
-            if error:
-                return error
+            self.genGlobalVar(script.lib, var)
 
         # namespaces
         for namespace in script.namespaces:
@@ -4374,6 +4385,12 @@ class compile2Csharp:
         self.write('\n}')
         return None
 
+    def getVarType(self, var):
+        return var.type
+    
+    def getVarValue(self, var):
+        return var.value
+
     def genVariable(self, var, inBody=False, _return=False):
         # Setup variable
         attributes = ''
@@ -4443,6 +4460,13 @@ class compile2Csharp:
             
         return None
 
+    def genGlobalVar(self, lib, var):
+        name = var.name.value
+        type = self.getVarType(var)
+        value = self.getVarValue(var)
+        
+        self.constants.append(constant(lib.value, name, type, value))
+        
 ####################
 # - Run Function - #
 ####################
