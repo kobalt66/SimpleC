@@ -4093,8 +4093,10 @@ class compile2Csharp:
             return 'char'
         elif type == TYP:
             return 'Type'
-        else:
+        elif type == VAR:
             return 'object'
+        else:
+            return type.value + '.' + type.value
 
     def genBodyParts(self, part):
         if isinstance(part, DotAccess):
@@ -4305,7 +4307,7 @@ class compile2Csharp:
                 return error
         self.write('\n')
 
-        self.write(f'\nstruct {struct.name.value}' + '\n{\n')
+        self.write(f'\npublic struct {struct.name.value}' + '\n{\n')
 
         # variables
         for var in struct.variables:
@@ -4360,7 +4362,7 @@ class compile2Csharp:
         self.write(f'\n{attributes}{func.returnType.value} {func.name.value}(')
 
         if func.name.value == 'Main':
-            self.write('string[] args)')
+            self.write('string[] args)\n{\n')
         else:
             currIdx = 0
             maxIdx = len(func.args)
@@ -4389,10 +4391,10 @@ class compile2Csharp:
         return None
 
     def getVarType(self, var):
-        return var.type
+        return self.convertType2String(var.value.type)
     
     def getVarValue(self, var):
-        return var.value
+        return var.value.value.value
 
     def genVariable(self, var, inBody=False, _return=False):
         # Setup variable
@@ -4464,11 +4466,11 @@ class compile2Csharp:
         return None
 
     def genGlobalVar(self, lib, var):
-        name = var.name.value
+        name = var.name
         type = self.getVarType(var)
         value = self.getVarValue(var)
         
-        self.constants.append(constant(lib.value, name, type, value))
+        self.constants.append(constant(lib, name, type, value))
         
 ####################
 # - Run Function - #
