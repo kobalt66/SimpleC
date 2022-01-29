@@ -3995,6 +3995,41 @@ class compile2Csharp:
             
         return None
         
+    def genIf(self, If):
+        self.write(f'\nif ({self.genOperationPart(If.condition)})' + '\n{\n')
+        
+        # body
+        for part in If.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+        
+        self.write('\n}')
+        
+        for _elif in If.cases:
+            self.write(f'\nelse if ({self.genOperationPart(_elif.condition)})' + '\n{\n')
+
+            # body
+            for part in _elif.body:
+                error = self.genBodyParts(part)
+                if error:
+                    return error
+            
+            self.write('\n}')
+            
+        if If.elseCase:
+            self.write('\nelse\n{\n')
+
+            # body
+            for part in _elif.body:
+                error = self.genBodyParts(part)
+                if error:
+                    return error
+            
+            self.write('\n}')
+            
+        return None
+    
     def genOperationPart(self, part):
         res = ''
 
@@ -4086,6 +4121,9 @@ class compile2Csharp:
             return None
         elif isinstance(part, While):
             self.genWhileLoop(part)
+            return None
+        elif isinstance(part, If):
+            self.genIf(part)
             return None
         
         return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
@@ -4423,3 +4461,4 @@ def run(fn, text):
 # - refactor the dotproduct > make a 'getVar()' function that return the requested varaible if possible (checks for the variables existance, static "state" and so on...)
 # - metacode
 #
+
