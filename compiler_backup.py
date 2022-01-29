@@ -1472,8 +1472,9 @@ class Parser:
         const = False
         protected = False
 
-        res.registerAdvance()
-        self.advance()
+        if self.currTok.value in (PUBLIC, PRIVATE):
+            res.registerAdvance()
+            self.advance()
 
         while self.currTok.value in (STATIC, CONST, PROTECTED):
             if self.currTok.value == STATIC:
