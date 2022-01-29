@@ -3936,6 +3936,11 @@ class compile2Csharp:
             else:
                 currAccess = currAccess.var.varName.value
         value += '.'
+        
+        if isinstance(currAccess, ReasignVar):
+            value += f'{currAccess.name.varName} {currAccess.op.value} {self.genOperationPart(currAccess.value)}'
+            return value
+        
         value += currAccess
 
         return value
