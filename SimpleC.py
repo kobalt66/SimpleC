@@ -13,10 +13,12 @@
 ##############################################################################################
 
 
+from ast import BinOp, UnaryOp
 from typing import Counter
 import string
 import os
 import numpy
+import random
 
 
 #############################
@@ -178,12 +180,16 @@ LBRACKET = '('
 RBRACKET = ')'
 ENDCOLUMN = ';'
 COMMA = ','
+EQEQ = '=='
 EOF = 'endofFile'
 
 LETTERS = string.ascii_letters
 DIGITS = '0123456789'
 LETGITS = LETTERS + DIGITS
 FLOATMIN = 0.0000000000000001
+
+outputdir = ""
+projectdir = ""
 
 # Extra types
 BON = 'binopnode'
@@ -212,6 +218,8 @@ ILLEGALCHAR = 'IllegalChar'
 EXPEXTEDCHAR = 'ExpectedChar'
 PARSEERROR = 'ParseError'
 SYNTAXERROR = 'SyntaxError'
+COMP2PYERROR = 'copmile2python < Error >'
+COMP2CSHARPERROR = 'compile2csharp < Error >'
 DIVBYZERO = 'DivisionByZero'
 PYTHON_EXCEPTION = 'Python Exception'
 # ... (more in the future)
@@ -338,55 +346,55 @@ class Lexer:
                     return [], error
                 tokens.append(token)
             elif self.currChar == ENDCOLUMN:            # ;
-                tokens.append(Token(ENDCOLUMN, start=self.pos))
+                tokens.append(Token(ENDCOLUMN, ENDCOLUMN, start=self.pos))
                 self.advance()
             elif self.currChar == LCBRACKET:            # {
-                tokens.append(Token(LCBRACKET, start=self.pos))
+                tokens.append(Token(LCBRACKET, LCBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == RCBRACKET:            # }
-                tokens.append(Token(RCBRACKET, start=self.pos))
+                tokens.append(Token(RCBRACKET, RCBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == LSBRACKET:            # [
-                tokens.append(Token(LSBRACKET, start=self.pos))
+                tokens.append(Token(LSBRACKET, LSBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == RSBRACKET:            # ]
-                tokens.append(Token(RSBRACKET, start=self.pos))
+                tokens.append(Token(RSBRACKET, RSBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == LBRACKET:             # (
-                tokens.append(Token(LBRACKET, start=self.pos))
+                tokens.append(Token(LBRACKET, LBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == RBRACKET:             # )
-                tokens.append(Token(RBRACKET, start=self.pos))
+                tokens.append(Token(RBRACKET, RBRACKET, start=self.pos))
                 self.advance()
             elif self.currChar == POWER:                # ^
-                tokens.append(Token(POWER, start=self.pos))
+                tokens.append(Token(POWER, POWER, start=self.pos))
                 self.advance()
             elif self.currChar == EQUALS:               # =
-                tokens.append(Token(EQUALS, start=self.pos))
+                tokens.append(Token(EQUALS, EQUALS, start=self.pos))
                 self.advance()
             elif self.currChar == ISEQUALTO:            # ?
-                tokens.append(Token(ISEQUALTO, start=self.pos))
+                tokens.append(Token(ISEQUALTO, ISEQUALTO, start=self.pos))
                 self.advance()
             elif self.currChar == NOT:                  # !
-                tokens.append(Token(NOT, start=self.pos))
+                tokens.append(Token(NOT, NOT, start=self.pos))
                 self.advance()
             elif self.currChar == MODULUS:              # %
-                tokens.append(Token(MODULUS, start=self.pos))
+                tokens.append(Token(MODULUS, MODULUS, start=self.pos))
                 self.advance()
             elif self.currChar == COMMA:                # ,
-                tokens.append(Token(COMMA, start=self.pos))
+                tokens.append(Token(COMMA, COMMA, start=self.pos))
                 self.advance()
             elif self.currChar == DOT:                  # .
-                tokens.append(Token(DOT, start=self.pos))
+                tokens.append(Token(DOT, DOT, start=self.pos))
                 self.advance()
             elif self.currChar == COLON:                # :
-                tokens.append(Token(COLON, start=self.pos))
+                tokens.append(Token(COLON, COLON, start=self.pos))
                 self.advance()
             elif self.currChar == AND:                  # &
-                tokens.append(Token(AND, start=self.pos))
+                tokens.append(Token(AND, AND, start=self.pos))
                 self.advance()
             elif self.currChar == OR:                   # |
-                tokens.append(Token(OR, start=self.pos))
+                tokens.append(Token(OR, OR, start=self.pos))
                 self.advance()
             else:                                       # Error if nothing is true
                 self.advance()
@@ -669,7 +677,7 @@ class Script:
 class Lib:
     def __init__(self, scripts, name):
         self.scripts = scripts
-        self.name = name
+        self.name = name if name else 'libDEFAULTlib'
 
     def __repr__(self):
         return f'Lib Node : \n[\n\n\t\tLibrary\'s name > {self.name}\n\t\tSpripts > {self.scripts}\n\n]'
@@ -791,9 +799,13 @@ class ListAccess(AccessPoint):
 
         self.start = start
         self.end = end
-        
+
     def __repr__(self):
         return f'\n\tListAccess Node: \n\t\tList name > {self.name}\n\t\tIndex > {self.elementIdx}'
+
+    def getType(self):
+        return LIA
+
 
 class List:
     def __init__(self, lib, namespace, classNode, public, static, const, type, name, elements, start, end):
@@ -823,7 +835,7 @@ class ListSpace:
     def __init__(self, length, elements):
         self.length = length
         self.elements = elements
-        
+
     def __repr__(self):
         return f'\n\tListSpace Node: \n\t\tLength > {self.length}\n\t\tElements > {self.elements}'
 
@@ -1210,16 +1222,22 @@ class Parser:
     def lib(self):
         res = ParseResult()
 
+        scripts = []
+        name = None
+
         script = res.register(self.script())
         if res.error:
             return res
 
-        return res.success(Lib(script, script.lib))
+        name = script.lib
+        scripts.append(script)
+
+        return res.success(Lib(scripts, name))
 
     def script(self):
         res = ParseResult()
         imports = []
-        lib = None
+        lib = 'libDEFAULTlib'
         namespaces = []
         global_variables = []
         global_classes = []
@@ -1233,7 +1251,7 @@ class Parser:
                     return res
 
                 if metaNode.type == LIB:
-                    lib = metaNode
+                    lib = metaNode.value
                 elif metaNode.type == IMPORT:
                     imports.append(metaNode)
                 else:
@@ -1306,7 +1324,7 @@ class Parser:
         elif self.currTok.value == IMPORT:
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == LESS:
                 return res.failure(
                     Error(
@@ -1315,17 +1333,17 @@ class Parser:
 
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == IDENTIFIER:
                 return res.failure(
                     Error(
                         "Expected identifier.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
 
-            libName = self.currTok 
+            libName = self.currTok
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == GREATER:
                 return res.failure(
                     Error(
@@ -1650,7 +1668,7 @@ class Parser:
                     functions.append(node)
             elif isinstance(node, OverrideFunction):
                 functions.append(node)
-            
+
             res.registerAdvance()
             self.advance()
 
@@ -1812,8 +1830,8 @@ class Parser:
                             "Expected ')'.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
 
-                body.append(Variable(None, None, None, False, False,
-                            False, type, varName, valueVarName))
+                body.append(ReasignVar(varName, Token(
+                    EQUALS, EQUALS), valueVarName))
                 res.registerAdvance()
                 self.advance()
 
@@ -2252,10 +2270,10 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                else:
-                    body.append(statement)
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                # else:
+                body.append(statement)
                 return res.success(While(None, variables, condition, body, do))
 
             while True:
@@ -2269,10 +2287,10 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                else:
-                    body.append(statement)
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                # else:
+                body.append(statement)
 
             if not self.currTok.type == RCBRACKET:
                 return res.failure(
@@ -2307,10 +2325,10 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                else:
-                    body.append(statement)
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                # else:
+                body.append(statement)
 
             if not self.currTok.type == RCBRACKET:
                 return res.failure(
@@ -2413,10 +2431,10 @@ class Parser:
             if res.error:
                 return res
 
-            if isinstance(statement, Variable):
-                variables.append(statement)
-            else:
-                body.append(statement)
+            # if isinstance(statement, Variable):
+            #     variables.append(statement)
+            # else:
+            body.append(statement)
             return res.success(For(None, variables, variable, condition, steps, body))
 
         while True:
@@ -2429,11 +2447,11 @@ class Parser:
                 break
             if res.error:
                 return res
-            
-            if isinstance(statement, Variable):
-                variables.append(statement)
-            else:
-                body.append(statement)
+
+            # if isinstance(statement, Variable):
+            #     variables.append(statement)
+            # else:
+            body.append(statement)
 
         if not self.currTok.type == RCBRACKET:
             return res.failure(
@@ -2483,9 +2501,9 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                elif isinstance(statement, Break) or isinstance(statement, Continue):
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                if isinstance(statement, Break) or isinstance(statement, Continue):
                     return res.failure(
                         Error(
                             "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2504,9 +2522,9 @@ class Parser:
                     if res.error:
                         return res
 
-                    if isinstance(statement, Variable):
-                        variables.append(statement)
-                    elif isinstance(statement, Break) or isinstance(statement, Continue):
+                    # if isinstance(statement, Variable):
+                    #    variables.append(statement)
+                    if isinstance(statement, Break) or isinstance(statement, Continue):
                         return res.failure(
                             Error(
                                 "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2585,9 +2603,9 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                elif isinstance(statement, Break) or isinstance(statement, Continue):
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                if isinstance(statement, Break) or isinstance(statement, Continue):
                     return res.failure(
                         Error(
                             "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2606,9 +2624,9 @@ class Parser:
                     if res.error:
                         return res
 
-                    if isinstance(statement, Variable):
-                        variables.append(statement)
-                    elif isinstance(statement, Break) or isinstance(statement, Continue):
+                    # if isinstance(statement, Variable):
+                    #     variables.append(statement)
+                    if isinstance(statement, Break) or isinstance(statement, Continue):
                         return res.failure(
                             Error(
                                 "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2630,9 +2648,9 @@ class Parser:
                 if res.error:
                     return res
 
-                if isinstance(statement, Variable):
-                    variables.append(statement)
-                elif isinstance(statement, Break) or isinstance(statement, Continue):
+                # if isinstance(statement, Variable):
+                #     variables.append(statement)
+                if isinstance(statement, Break) or isinstance(statement, Continue):
                     return res.failure(
                         Error(
                             "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2651,9 +2669,9 @@ class Parser:
                     if res.error:
                         break
 
-                    if isinstance(statement, Variable):
-                        variables.append(statement)
-                    elif isinstance(statement, Break) or isinstance(statement, Continue):
+                    # if isinstance(statement, Variable):
+                    #     variables.append(statement)
+                    if isinstance(statement, Break) or isinstance(statement, Continue):
                         return res.failure(
                             Error(
                                 "Break points and continues cannot be defined inside an if-statement.", SYNTAXERROR,
@@ -2738,36 +2756,37 @@ class Parser:
         elif self.currTok.type == LSBRACKET:
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == INT:
                 if not self.currTok.type == IDENTIFIER:
                     return res.failure(
                         Error(
                             "Expected integer or identifier.", SYNTAXERROR,
-                            self.currTok.start, self.scriptName)) 
-            
+                            self.currTok.start, self.scriptName))
+
             idx = self.currTok
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == RSBRACKET:
                 return res.failure(
                     Error(
                         "Expected ']'.", SYNTAXERROR,
-                        self.currTok.start, self.scriptName)) 
-            
-            left = ListAccess(currTok.value, idx, self.currTok.start, self.currTok.end)
-            
+                        self.currTok.start, self.scriptName))
+
+            left = ListAccess(currTok.value, idx,
+                              self.currTok.start, self.currTok.end)
+
             self.advance()
             if self.currTok.type == DOT:
                 res.registerAdvance()
-                
+
                 res.registerAdvance()
                 self.advance()
                 expr = res.register(self.atom())
                 if res.error:
                     return res
-                
+
                 if isinstance(expr, VarAccess):
                     return res.success(DotAccess(left, expr, None))
                 elif isinstance(expr, ArgAccess):
@@ -2780,13 +2799,13 @@ class Parser:
                     return res.success(DotAccess(left, None, expr))
             elif self.currTok.type == EQUALS:
                 res.registerAdvance()
-                
+
                 res.registerAdvance()
                 self.advance()
                 value = res.register(self.expr())
                 if res.error:
                     return res
-                
+
                 if isinstance(value, ArgAccess):
                     if not self.currTok.type == ENDCOLUMN:
                         return res.failure(
@@ -2799,11 +2818,11 @@ class Parser:
                         Error(
                             "Expected ';'.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
-                
+
                 return res.success(ReasignVar(left, EQUALS, value))
             else:
                 self.reverse()
-        
+
             return res.success(left)
         elif self.currTok.type == DOT:
             res.registerAdvance()
@@ -2823,7 +2842,7 @@ class Parser:
                 return res.success(DotAccess(currTok, expr, None))
             elif isinstance(expr, ReasignVar):
                 return res.success(DotAccess(currTok, None, expr))
-            
+
         # If it's just an identifier
         self.reverse()
         return res.success(VarAccess(None, currTok.value, currTok.start, currTok.end))
@@ -2834,30 +2853,30 @@ class Parser:
         type = self.currTok.value
         res.registerAdvance()
         self.advance()
-        
+
         if self.currTok.type == LSBRACKET:
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == RSBRACKET:
                 return res.failure(
                     Error(
                         "Expected ']'.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
-                
+
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == IDENTIFIER:
                 return res.failure(
-                Error(
-                    "Expected identifier.", SYNTAXERROR,
-                    self.currTok.start, self.scriptName))
+                    Error(
+                        "Expected identifier.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
 
             name = self.currTok.value
             res.registerAdvance()
-            self.advance()   
-            
+            self.advance()
+
             if not self.currTok.type == EQUALS:
                 return res.failure(
                     Error(
@@ -2866,13 +2885,13 @@ class Parser:
 
             res.registerAdvance()
             self.advance()
-            
+
             value = res.register(self.listElements())
             if res.error:
                 return res
 
             return res.success(List(None, None, None, False, False, False, type, name, value, self.currTok.start, self.currTok.end))
-            
+
         if not self.currTok.type == IDENTIFIER:
             return res.failure(
                 Error(
@@ -2909,20 +2928,20 @@ class Parser:
 
     def listElements(self):
         res = ParseResult()
-        
+
         if self.currTok.type == VARTYPE:
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == LSBRACKET:
                 return res.failure(
                     Error(
                         "Expected '['.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
-            
+
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == INT:
                 return res.failure(
                     Error(
@@ -2932,43 +2951,43 @@ class Parser:
             length = int(self.currTok.value)
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == RSBRACKET:
                 return res.failure(
                     Error(
                         "Expected '['.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
-            
+
             res.registerAdvance()
             self.advance()
-            
+
             if not self.currTok.type == ENDCOLUMN:
                 return res.failure(
                     Error(
                         "Expected ';'.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
-            
+
             return res.success(ListSpace(length, None))
-        
+
         if not self.currTok.type == LCBRACKET:
             return res.failure(
                 Error(
                     "Expected '{'.", SYNTAXERROR,
                     self.currTok.start, self.scriptName))
-        
+
         elements = []
         while True:
             res.registerAdvance()
             self.advance()
-        
+
             element = res.tryRegister(self.expr())
-            
+
             self.advance()
             if self.currTok.type in (COMMA, RCBRACKET):
                 res.registerAdvance()
             else:
                 self.reverse()
-            
+
             if not element:
                 self.reverse(res.reverseCount)
                 break
@@ -2976,10 +2995,10 @@ class Parser:
                 return res
 
             elements.append(element)
-            
+
             if self.currTok.type == COMMA:
                 continue
-            
+
             if not self.currTok.type == RCBRACKET:
                 return res.failure(
                     Error(
@@ -2987,9 +3006,9 @@ class Parser:
                         self.currTok.start, self.scriptName))
             else:
                 break
-        
+
         return res.success(ListSpace(len(elements), elements))
-                
+
     def atom(self):
         res = ParseResult()
         tok = self.currTok
@@ -3065,14 +3084,14 @@ class Parser:
                 value = res.register(self.accessPointOrIdentifier())
                 if res.error:
                     return res
-                
+
                 self.advance()
-                
+
                 if not self.currTok.type == ENDCOLUMN:
                     self.reverse()
                 else:
                     res.registerAdvance()
-                    
+
                 return res.success(value)
 
             return res.success(VarAccess(None, tok, tok.start, tok.end))
@@ -3140,7 +3159,7 @@ class Parser:
             return res.success(UnaryNode(op_tok, node))
 
         node = res.register(self.bin_op(
-            self.arith_expr, (ISEQUALTO, NOT, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
+            self.arith_expr, (EQUALS, ISEQUALTO, NOT, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
         if res.error:
             return res
 
@@ -3213,7 +3232,7 @@ class Parser:
         if not isinstance(left, BinOpNode) and self.currTok.type in (PLUSPLUS, MINUSMINUS):
             op_tok = self.currTok
             return res.success(BinOpNode(left, op_tok, Number(INT, Token(INT, "1", self.currTok.start, self.currTok.end))))
-        
+
         while self.currTok.type in ops:
             op_tok = self.currTok
             res.registerAdvance()
@@ -3227,13 +3246,1211 @@ class Parser:
 
 
 ####################
+# - The compiler - #
+####################
+
+
+# - The output file will allways be called "output.py"                                                                                  (check)
+# - The compiler gets the data of the masterscript so it has access to all the data inside the SimpleC project                          (check)
+# - It will start running through all that data (script by script)
+# - When comiling, the compiler will first check for any old "output.py" file and reset it                                              (check)
+# - Everything will be loaded into one file                                                                                             (check)
+# - First all the necessary stuff like classes are going to be pasted into the script
+# - Then all scripts with their namespaces, classes, structs and constants will be loaded below
+# - In the mean while the compiler will check for the correctness of the script
+# - In the end a main function will be generated containing all necessary instructions to run the script
+# - The final step would be to call that main function at the end of the script
+# - Then the compiler returns to "main.py" (basically all the compiling errors)
+# - The program stops
+# - Now in the custom code editor the code will receive a callback to give the user access to the start button
+# - If the script is compiled the code editor will look for any errors it received from the compiler and mark them in the scripts
+# - When pressing the start button the script will be started and the output of that script will be displayed in the console
+
+class compPath:
+    def __init__(self, name, path):
+        self.name = name
+        self.path = path
+
+    def compare(self, name):
+        return self.name == name
+
+
+class compile2python:
+    def __init__(self, masterscript, outputdir, projectdir):
+        self.outputdir = outputdir
+        self.projectdir = projectdir
+
+        # compiler stuff
+        self.ms = masterscript
+        self.defaultLib = 'libDEFAULTlib'
+        self.noneStr = 'None'
+        self.outputFile = f'{self.outputdir}output.py'
+
+        self.pathData = []
+
+        self.namespaceNames = []
+        self.classNames = []
+        self.structNames = []
+        self.varNames = []
+
+        self.basicData = [
+            "VAR = 'var'",
+            "BYT = 'byt'",
+            "CHR = 'chr'",
+            "STR = 'str'",
+            "INT = 'int'",
+            "FLT = 'flt'",
+            "DBL = 'dbl'",
+            "BOL = 'bol'",
+            "TYP = 'typ'",
+            ' ',
+            'class InvalidAccess(Exception):\n\tpass',
+            ' ',
+            'class arg:\n\tdef __init__(self, name, type):\n\t\tself.arg = Var(False, False, True, type, name)\n\t\tself.name = name\n\t\tself.type = type',
+            ' ',
+            'class Var:\n\tdef __init__(self, public, static, const, type, name, value=None):\n\t\tself.public = public\n\t\tself.static = static\n\t\tself.const = const\n\t\tself.type = type\n\n\t\tself.name = name\n\t\tself.valType = None\n\t\tself.value = None if not value else value\n\n\tdef getType(self):\n\t\treturn self.type\n\n\tdef equals(self, value):\n\t\tif self.const and self.value: raise SyntaxError(f\'{self.name} is a constant!\')\n\t\tif self.compareType(value):\n\t\t\tself.value = value.value\n\n\tdef compareType(self, value):\n\t\tif not isinstance(value, Var):\n\t\t\tif not self.getType() == VAR:\n\t\t\t\tif self.getType() == INT and not isinstance(value, int) or self.getType() == FLT and not isinstance(value, float) or self.getType() == DBL and not isinstance(value, float) or self.getType() == BOL and not isinstance(value, bool) or self.getType() == BYT and not isinstance(value, int) or self.getType() == STR and not isinstance(value, str) or self.getType() == CHR and (not isinstance(value, str) or len(value) > 1):\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value)} into {self.getType()}!\')\n\t\t\treturn True\n\t\telse:\n\t\t\tif not self.getType() == Var:\n\t\t\t\tif not self.getType() == value.getType():\n\t\t\t\t\traise SyntaxError(f\'{self.name}: cannot convert a {type(value.value)} into {self.getType()}!\')\n\t\t\treturn True',
+            ' ',
+            "SCRIPT = 'script'",
+            "LIB = 'library'",
+            "SPACE = 'namespace'",
+            "CLASS = 'class'",
+            "STRUCT = 'struct'"
+        ]
+
+        # Setup output.py
+        if os.path.exists(self.outputFile):
+            f = open(self.outputFile, 'w')
+            f.write('# This is the compiled script of your project.\n\n')
+            f.close()
+        else:
+            f = open(self.outputFile, 'x')
+            f.close()
+
+    def genHexCode(self):
+        return '{0:032x}'.format(random.randrange(16**32))
+
+    def getPath(self, name):
+        for path in self.pathData:
+            if path.compare(name):
+                return path.path
+        return 'self'
+
+    def write(self, data, print=False):
+        f = open(self.outputFile, 'a')
+        f.write(data)
+        f.close()
+
+        # Open and read the file after the appending
+        if print:
+            f = open(self.outputFile, 'r')
+            print(f.read())
+            f.close()
+
+    def compile(self):
+        # Write all the basic data into the script
+        for data in self.basicData:
+            self.write(data)
+            self.write('\n')
+        self.write('\n' + '#' * 200)
+
+        # Start with libs
+        for lib in self.ms.libs:
+            mPath = lib.name
+            self.pathData.append(compPath(lib.name, lib.name))
+
+            self.write('\n\n')
+            self.write(
+                f'class {lib.name}:\n\tdef __init__(self):\n\t\tself.type = LIB')
+
+            # Generate all script classes
+            for script in lib.scripts:
+                error = self.genScript(script, mPath)
+                if error:
+                    return error
+            self.write('\n\n')
+
+        print('Successfully compiled the project!')
+        return None
+
+    def checkPaths(self):
+        f = open(self.outputFile, 'r')
+        oldScript = f.read()
+        f.close()
+
+        # Check for @!VM!@ and replaces it with the right path
+        idx = 0
+        newScript = ''
+        while idx < len(oldScript):
+            currChar = oldScript[idx]
+            if currChar == '@':
+                following = oldScript[idx + 1:idx + 6]
+                if following == '!VM!@':
+                    name = ''
+                    idx += 7
+                    while True:
+                        currChar = oldScript[idx]
+                        if currChar in LETGITS + '_':
+                            name += currChar
+                            idx += 1
+                        else:
+                            break
+                    newScript += self.getPath(name)
+            else:
+                newScript += oldScript[idx]
+                idx += 1
+
+        # Set up new script
+        f = open(self.outputFile, 'w')
+        f.write(newScript)
+        f.close()
+
+    def genScript(self, script, parentPath):
+        mPath = f'{parentPath}.{script.name}'
+        self.pathData.append(compPath(script.name, mPath))
+
+        self.write(
+            f'\n\n\tclass {script.name}:\n\t\tdef __init__(self):\n\t\t\tself.type = SCRIPT\n\t\t\tself.imports = [')
+
+        # imports
+        for imp in script.imports:
+            self.write(f'\n\t\t\t\t\'{imp.value}\',')
+        self.write('\n\t\t\t]\n')
+
+        # lib
+        self.write(
+            f'\t\t\tself.lib = \'{script.lib if script.lib else self.defaultLib}\'')
+
+        # global_variables
+        for var in script.global_variables:
+            if not var.name in self.varNames:
+                self.varNames.append(var.name)
+                error = self.genVariable(var, 3, mPath)
+                if error:
+                    return error
+            else:
+                return Error(f'You cannot use {var.name} twice.', COMP2PYERROR,
+                             Position(-1, -1, -1, '', ''), '<comiler>')
+
+        # namespaces
+        for namespace in script.namespaces:
+            if not namespace.name.value in self.namespaceNames:
+                self.namespaceNames.append(namespace.name.value)
+                error = self.genNamespace(namespace, 2, mPath)
+                if error:
+                    return error
+            else:
+                return Error(f'You cannot use {namespace.name.value} twice.', COMP2PYERROR,
+                             Position(-1, -1, -1, '', ''), '<comiler>')
+
+        # classes
+        for _class in script.global_classes:
+            if not _class.name.value in self.classNames:
+                self.classNames.append(_class.name.value)
+                error = self.genClass(_class, 2, mPath)
+                if error:
+                    return error
+            else:
+                return Error(f'You cannot use {_class.name.value} twice.', COMP2PYERROR,
+                             Position(-1, -1, -1, '', ''), '<comiler>')
+
+        # structs
+        for struct in script.global_structs:
+            if not struct.name.value in self.structNames:
+                self.structNames.append(struct.name.value)
+                error = self.genStruct(struct, 2, mPath)
+                if error:
+                    return error
+            else:
+                return Error(f'You cannot use {struct.name.value} twice.', COMP2PYERROR,
+                             Position(-1, -1, -1, '', ''), '<comiler>')
+
+        # getVar function
+        self.write(f'\n\n\t\tdef getVar(self, var):\n\t\t\tcheck = hasattr(self, var)\n\t\t\tif check:\n\t\t\t\tmember = getattr(self, var)\n\t\t\t\tif isinstance(member, Var):\n\t\t\t\t\tif not member.public and not member.static:\n\t\t\t\t\t\traise InvalidAccess(f\'' +
+                   '{var}' + f' is not accessable.\')\t\n\t\t\t\telse:\n\t\t\t\t\treturn member\n\t\t\telse:\n\t\t\t\traise AttributeError(f\'' + '{var}' + ' does not exist inside {self.__class__.__name__}.\')')
+
+        return None
+
+    def genNamespace(self, namespace, tabs, parentPath):
+        tab = '\t'
+        mPath = f'{parentPath}.{namespace.name.value}'
+        self.pathData.append(compPath(namespace.name.value, mPath))
+
+        self.write(
+            f'\n\n{tab * tabs}class {namespace.name.value}:\n{tab * tabs}\tdef __init__(self):\n{tab * tabs}\t\tself.type = SPACE')
+
+        # parent namespace
+        self.write(f'\n{tab * tabs}\t\tself.parentSpace = {parentPath}()')
+
+        # name
+        self.write(f'\n{tab * tabs}\t\tself.name = \'{namespace.name.value}\'')
+
+        # child namespaces
+        for childNamespace in namespace.childSpaces:
+            if not childNamespace.name.value in self.namespaceNames:
+                self.namespaceNames.append(childNamespace.name.value)
+                error = self.genNamespace(childNamespace, tabs + 1, mPath)
+                if error:
+                    return error
+            else:
+                return Error(f'You cannot use {childNamespace.name} twice.', COMP2PYERROR,
+                             Position(-1, -1, -1, '', ''), '<comiler>')
+
+        # classes
+        for _class in namespace.classes:
+            if not _class.name.value in self.classNames:
+                self.classNames.append(_class.name.value)
+                error = self.genClass(_class, tabs + 1, mPath)
+                if error:
+                    return error
+            else:
+                return Error(f'You cannot use {_class.name.value} twice.', COMP2PYERROR,
+                             Position(-1, -1, -1, '', ''), '<comiler>')
+
+        # structs
+        for struct in namespace.structs:
+            if not struct.name.value in self.structNames:
+                self.structNames.append(struct.name.value)
+                error = self.genStruct(struct, tabs + 1, mPath)
+                if error:
+                    return error
+            else:
+                return Error(f'You cannot use {struct.name.value} twice.', COMP2PYERROR,
+                             Position(-1, -1, -1, '', ''), '<comiler>')
+
+        return None
+
+    def genClass(self, _class, tabs, parentPath):
+        tab = '\t'
+        mPath = f'{parentPath}.{_class.name.value}'
+        self.pathData.append(compPath(_class.name.value, mPath))
+
+        # keep track of all the used names
+        varNames = []
+        funcNames = []
+
+        self.write(
+            f'\n\n{tab * tabs}class {_class.name.value}:\n{tab * tabs}\tdef __init__(self, *args):\n{tab * tabs}\t\tself.type = CLASS')
+
+        # using
+        for using in _class.externNameSpaces:
+            error = self.genUsing(using, tabs + 2)
+            if error:
+                return error
+        self.write('\n')
+
+        # variables
+        for var in _class.variables:
+            if not var.name in varNames:
+                self.varNames.append(var.name)
+                error = self.genVariable(var, 5, mPath)
+                if error:
+                    return error
+            else:
+                return Error(f'You cannot use {var.name} twice.', COMP2PYERROR,
+                             Position(-1, -1, -1, '', ''), '<comiler>')
+
+        # constructors
+
+        # getVar function
+        self.write(f'\n\n{tab * tabs}\tdef getVar(self, var):\n{tab * tabs}\t\tcheck = hasattr(self, var)\n{tab * tabs}\t\tif check:\n{tab * tabs}\t\t\tmember = getattr(self, var)\n{tab * tabs}\t\t\tif isinstance(member, Var):\n{tab * tabs}\t\t\t\tif not member.public and not member.static:\n{tab * tabs}\t\t\t\t\traise InvalidAccess(f\'' +
+                   '{var}' + f' is not accessable.\')\n{tab * tabs}\t\t\t\telse:\n{tab * tabs}\t\t\t\t\treturn member\n{tab * tabs}\t\telse:\n{tab * tabs}\t\t\traise AttributeError(f\'' + '{var}' + ' does not exist inside {self.__class__.__name__}.\')')
+
+        return None
+
+    # make a pool for all the static members of a class/struct and a function to get a variable
+    def genStruct(self, struct, tabs, parentPath):
+        tab = '\t'
+        mPath = f'{parentPath}.{struct.name.value}'
+        self.pathData.append(compPath(struct.name.value, mPath))
+
+        # keep track of all the used names
+        varNames = []
+
+        self.write(
+            f'\n\n{tab * tabs}class {struct.name.value}:\n{tab * tabs}\tdef __init__(self, *args):\n{tab * tabs}\t\tself.type = STRUCT')
+
+        # parent
+        self.write(f'\n{tab * tabs}\t\tself.parent = {parentPath}()')
+
+        # using
+        for using in struct.externNameSpaces:
+            error = self.genUsing(using, tabs + 2)
+            if error:
+                return error
+        self.write('\n')
+
+        # variables
+        for var in struct.variables:
+            if not var.name in varNames:
+                self.varNames.append(var.name)
+                error = self.genVariable(var, 5, mPath)
+                if error:
+                    return error
+            else:
+                return Error(f'You cannot use {var.name} twice.', COMP2PYERROR,
+                             Position(-1, -1, -1, '', ''), '<comiler>')
+
+        # constructors
+        count = 0
+        for const in struct.constructors:
+            count += 1
+            error = self.genConstructor(const, count, 5, mPath)
+            if error:
+                return error
+
+        # getVar function
+        self.write(f'\n\n{tab * tabs}\tdef getVar(self, var):\n{tab * tabs}\t\tcheck = hasattr(self, var)\n{tab * tabs}\t\tif check:\n{tab * tabs}\t\t\tmember = getattr(self, var)\n{tab * tabs}\t\t\tif isinstance(member, Var):\n{tab * tabs}\t\t\t\tif not member.public and not member.static:\n{tab * tabs}\t\t\t\t\traise InvalidAccess(f\'' +
+                   '{var}' + f' is not accessable.\')\n{tab * tabs}\t\t\t\telse:\n{tab * tabs}\t\t\t\t\treturn member\n{tab * tabs}\t\telse:\n{tab * tabs}\t\t\traise AttributeError(f\'' + '{var}' + ' does not exist inside {self.__class__.__name__}.\')')
+
+        return None
+
+    def genUsing(self, using, tabs):
+        tab = '\t'
+
+        if isinstance(using.name, VarAccess):
+            self.write(
+                f'\n{tab * tabs}self.{using.name.varName.value.capitalize()} = @!VM!@.{using.name.varName.value}()')
+        elif isinstance(using.name, DotAccess):
+            dotAccess, lastNamespace = self.genDotaccess(using.name, True)
+            self.write(
+                f'\n{tab * tabs}self.{lastNamespace.capitalize()} = @!VM!@{dotAccess}()')
+        else:
+            return Error(f'You can only use a varaccess point inside a using expression.', COMP2PYERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+
+        return None
+
+    def genArgs(self, var):
+        value = ''
+
+        for arg in var.args:
+            if isinstance(arg, VarAccess):
+                value += f'@!VM!@.{arg.varName.value},'
+            elif isinstance(arg, DotAccess):
+                value += '@!VM!@'
+                currAccess = arg
+                while isinstance(currAccess, DotAccess) and currAccess.parent.value:
+                    value += '.'
+                    value += currAccess.parent.value
+                    if currAccess.node:
+                        currAccess = currAccess.node
+                    else:
+                        currAccess = currAccess.var.varName.value
+                value += '.'
+                value += currAccess
+                value += ','
+            else:
+                if isinstance(arg, String):
+                    value += f'\'{arg.value.value}\','
+                elif isinstance(arg, Bool):
+                    value += f'{str(arg.value.value).capitalize()},'
+                else:
+                    value += f'{arg.value.value},'
+        return value
+
+    def genDotaccess(self, var, returnLast=False):
+        value = ''
+
+        currAccess = var
+        while isinstance(currAccess, DotAccess) and currAccess.parent.value:
+            value += '.'
+            value += currAccess.parent.value
+            if currAccess.node:
+                currAccess = currAccess.node
+                if isinstance(currAccess, ArgAccess):
+                    argAccess = self.genArgaccess(currAccess)
+                    value += '.' + argAccess
+                    return value
+            else:
+                currAccess = currAccess.var.varName.value
+        value += '.'
+        value += currAccess
+
+        if returnLast:
+            return value, currAccess
+        return value
+
+    def genConstructor(self, const, num, tabs, parentPath):
+        tab = '\t'
+
+        # keep track of all the used names
+        varNames = []
+
+        # generate args
+        self.write('\n')
+        argNames = []
+        for arg in const.args:
+            argCode = 'p_' + self.genHexCode()
+            argNames.append(argCode)
+            self.write(
+                f'\n{tab * tabs}{argCode} = arg(\'{arg.name.value}\', \'{arg.type.value}\')')
+
+        # generating arg list
+        list = f'argList{num}'
+        listStr = f'\n{tab * tabs}{list} = ['
+        for argName in argNames:
+            listStr += argName + ','
+        listStr += ']'
+        self.write(listStr)
+
+        # generate constructor function
+        self.write(
+            f'\n{tab * tabs}if True == [{list}[x].arg.compareType(args[x]) for x in range(len(list))]:')
+
+        if len(const.variables) > 0 or len(const.body) > 0:
+            # variables
+            for var in const.variables:
+                if not var.name in varNames:
+                    self.varNames.append(var.name)
+                    error = self.genVariable(var, 6, None)
+                    if error:
+                        return error
+                else:
+                    return Error(f'You cannot use {var.name} twice.', COMP2PYERROR,
+                                 Position(-1, -1, -1, '', ''), '<comiler>')
+
+            # body
+            for part in const.body:
+                error = self.genBodyParts(part, 6)
+                if error:
+                    return error
+        else:
+            self.write(f'\n{tab * tabs}\tpass')
+
+        return None
+
+    def function(self, func, parentPath):
+        pass
+
+    def genBodyParts(self, part, tabs):
+        tab = '\t'
+
+        if isinstance(part, DotAccess):
+            self.write(f'\n{tab * tabs}@!VM!@.{self.genDotaccess(part)})')
+            return None
+        elif isinstance(part, ArgAccess):
+            self.write(
+                f'\n{tab * tabs}@!VM!@.{part.name}({self.genArgs(part)})')
+            return None
+        elif isinstance(part, BinOpNode):
+            self.genBinOp(part.left, part.op, part.right)
+
+        return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2PYERROR,
+                     Position(-1, -1, -1, '', ''), '<comiler>')
+
+    def genBinOp(self, left, op, right):
+        tab = '\t'
+
+    def genVariable(self, var, tabs, parentPath):
+        tab = '\t'
+        if parentPath:
+            mPath = f'{parentPath}().getVar(\'{var.name}\')'
+            self.pathData.append(compPath(var.name, mPath))
+
+        if isinstance(var.value, AccessPoint):
+            if isinstance(var.value, ArgAccess):
+                # setting up variable
+                self.write(
+                    f'\n{tab * tabs}self.{var.name} = Var({var.public}, {var.static}, {var.const}, \'{var.type.value if not isinstance(var.type, str) else var.type}\', \'{var.name}\')')
+
+                # defining variable
+                self.write(
+                    f'\n{tab * tabs}self.{var.name}.equals(@!VM!@.{var.value.name}({self.genArgs(var.value)}))')
+            elif isinstance(var.value, DotAccess):
+                # setting up variable
+                self.write(
+                    f'\n{tab * tabs}self.{var.name} = Var({var.public}, {var.static}, {var.const}, \'{var.type.value if not isinstance(var.type, str) else var.type}\', \'{var.name}\')')
+
+                # defining variable
+                self.write(
+                    f'\n{tab * tabs}self.{var.name}.equals(@!VM!@{self.genDotaccess(var.value)})')
+            elif isinstance(var.value, ListAccess):
+                pass
+            elif isinstance(var.value, VarAccess):
+                # setting up variable
+                self.write(
+                    f'\n{tab * tabs}self.{var.name} = Var({var.public}, {var.static}, {var.const}, \'{var.type.value if not isinstance(var.type, str) else var.type}\', \'{var.name}\')')
+
+                # defining variable
+                self.write(
+                    f'\n{tab * tabs}self.{var.name}.equals(@!VM!@.{var.value.varName.value})')
+        else:
+            # setting up variable
+            self.write(
+                f'\n{tab * tabs}self.{var.name} = Var({var.public}, {var.static}, {var.const}, \'{var.type.value if not isinstance(var.type, str) else var.type}\', \'{var.name}\')')
+
+            # defining variable
+            if var.value:
+                if isinstance(var.value, String):
+                    self.write(
+                        f'\n{tab * tabs}self.{var.name}.equals(\'{var.value.value.value}\')')
+                elif isinstance(var.value, Bool):
+                    self.write(
+                        f'\n{tab * tabs}self.{var.name}.equals({str(var.value.value.value).capitalize()})')
+                else:
+                    self.write(
+                        f'\n{tab * tabs}self.{var.name}.equals({var.value.value.value})')
+        return None
+
+
+class compile2Csharp:
+    def __init__(self, masterscript, outputdir, projectdir):
+        self.outputdir = outputdir
+        self.projectdir = projectdir
+
+        # compiler stuff
+        self.ms = masterscript
+        self.defaultLib = 'libDEFAULTlib'
+        self.noneStr = 'None'
+        self.outputFile = f'{self.outputdir}output.cs'
+
+        # keeping track of names
+        self.classes = []
+        self.structs = []
+
+        self.basicData = [
+            'using System;',
+            'using System.Collections;',
+            'using System.Collections.Generic;',
+            ' ',
+            'public const object lengthof = (list) => { return (list as Array).Length; };'
+        ]
+
+        # Setup output.py
+        if os.path.exists(self.outputFile):
+            f = open(self.outputFile, 'w')
+            f.write('// This is the compiled script of your project.\n\n')
+            f.close()
+        else:
+            f = open(self.outputFile, 'x')
+            f.close()
+
+    def write(self, data, print=False):
+        f = open(self.outputFile, 'a')
+        f.write(data)
+        f.close()
+
+        # Open and read the file after the appending
+        if print:
+            f = open(self.outputFile, 'r')
+            print(f.read())
+            f.close()
+
+    def genUsing(self, using):
+        if isinstance(using.name, VarAccess):
+            self.write(
+                f'using {using.name.varName.value};')
+        elif isinstance(using.name, DotAccess):
+            dotAccess = self.genDotaccess(using.name)
+            self.write(
+                f'using {dotAccess};')
+        else:
+            return Error(f'You can only use a varaccess point inside a using expression.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+
+        return None
+
+    def genString(self, var):
+        return f'"{var.value.value}"' if len(var.value.value) > 1 else f'\'{var.value.value}\''
+
+    def genNumber(self, var):
+        res = str(var.value.value)
+        res += 'f' if var.type == FLT else ''
+        return res
+
+    def genArgs(self, var):
+        value = ''
+
+        currIdx = 0
+        maxIdx = len(var.args)
+        for arg in var.args:
+            currIdx += 1
+            if isinstance(arg, VarAccess):
+                value += f'{arg.varName.value}'
+            elif isinstance(arg, DotAccess):
+                currAccess = arg
+                while isinstance(currAccess, DotAccess) and currAccess.parent.value:
+                    value += '.'
+                    value += currAccess.parent.value
+                    if currAccess.node:
+                        currAccess = currAccess.node
+                    else:
+                        currAccess = currAccess.var.varName.value
+                value += '.'
+                value += currAccess
+            else:
+                if isinstance(arg, String):
+                    value += f'\'{arg.value.value}\''
+                elif isinstance(arg, Bool):
+                    value += f'{str(arg.value.value)}'
+                elif isinstance(arg, BinOpNode):
+                    value += f'{self.genOperationPart(arg)}'
+                elif isinstance(arg, UnaryNode):
+                    value += f'{self.genOperationPart(arg)}'
+                else:
+                    value += f'{arg.value.value}'
+
+            if currIdx < maxIdx:
+                value += ', '
+
+        return value
+
+    def genArgAccess(self, access):
+        Var = access.name
+        value = Var if not Var in self.classes and not Var in self.structs else f'{Var}.{Var}'
+        res = f'{value}('
+
+        currIdx = 0
+        maxIdx = len(access.args)
+        for param in access.args:
+            if isinstance(param, Number):
+                res += self.genNumber(param)
+            elif isinstance(param, String):
+                res += self.genString(param)
+            elif isinstance(param, VarAccess):
+                res += param.varName.value
+            elif isinstance(param, DotAccess):
+                res += self.genDotaccess(param)
+            else:
+                res += param.value.value
+
+            currIdx += 1
+            if currIdx < maxIdx:
+                res += ', '
+
+        res += ')'
+        return res
+
+    def genDotaccess(self, var):
+        value = ''
+
+        currIdx = 0
+        currAccess = var 
+        while isinstance(currAccess, DotAccess) and currAccess.parent.value:
+            value += '.' if currIdx > 0 else ''
+            currIdx += 1
+
+            value += currAccess.parent.value
+            if currAccess.node:
+                currAccess = currAccess.node
+                if isinstance(currAccess, ArgAccess):
+                    argAccess = self.genArgAccess(currAccess)
+                    value += '.' + argAccess
+                    return value
+            else:
+                currAccess = currAccess.var.varName.value
+        value += '.'
+        
+        if isinstance(currAccess, ReasignVar):
+            value += f'{currAccess.name.varName} {currAccess.op.value} {self.genOperationPart(currAccess.value)}'
+            return value
+        
+        value += currAccess
+
+        return value
+
+    def genListAccess(self, var):
+        return f'{var.name}[{var.elementIdx.value}]'
+
+    def genUnaryOp(self, op, node):
+        return f'{op.value}{self.genOperationPart(node)}'
+
+    def genBinOp(self, left, op, right):
+        return f'{self.genOperationPart(left)} {op.value if not op.value == ISEQUALTO else EQEQ} {self.genOperationPart(right)}'
+
+    def genReasign(self, name, op, value):
+        if op.value == PLUSPLUS:
+            return f'{name}++'
+        elif op.value == MINUSMINUS:
+            return f'{name}--'
+        return f'{name} {op.value} {self.genOperationPart(value)}'
+
+    def genReturn(self, _return):
+        if _return.returnValue == VOID:
+            self.write('\nreturn;')
+        else:
+            self.write(f'\nreturn {self.genOperationPart(_return.returnValue)};')
+
+    def genContinue(self):
+        self.write('\ncontinue;')
+
+    def genBreak(self):
+        self.write('\nbreak;')
+    
+    def genForLoop(self, loop):
+        self.write(f'\nfor ({self.genVariable(loop.variable, True, True)} {self.genOperationPart(loop.condition)}; {self.genReasign(loop.steps.name.varName, loop.steps.op, loop.steps.value)})' + '\n{\n')
+        
+        # body
+        for part in loop.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+        
+        self.write('\n}')
+        return None
+    
+    def genWhileLoop(self, loop):
+        if loop.do:
+            self.write('\ndo \n{\n')
+        else:
+            self.write(f'\nwhile ({self.genOperationPart(loop.condition)})' + '\n{\n')
+            
+        # body
+        for part in loop.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+        
+        if loop.do:
+            self.write('\n}' + f' while ({self.genOperationPart(loop.condition)});')
+        else:
+            self.write('\n}')
+            
+        return None
+        
+    def genIf(self, If):
+        self.write(f'\nif ({self.genOperationPart(If.condition)})' + '\n{\n')
+        
+        # body
+        for part in If.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+        
+        self.write('\n}')
+        
+        for _elif in If.cases:
+            self.write(f'\nelse if ({self.genOperationPart(_elif.condition)})' + '\n{\n')
+
+            # body
+            for part in _elif.body:
+                error = self.genBodyParts(part)
+                if error:
+                    return error
+            
+            self.write('\n}')
+            
+        if If.elseCase:
+            self.write('\nelse\n{\n')
+
+            # body
+            for part in _elif.body:
+                error = self.genBodyParts(part)
+                if error:
+                    return error
+            
+            self.write('\n}')
+            
+        return None
+    
+    def genOperationPart(self, part):
+        res = ''
+
+        if isinstance(part, DotAccess):
+            res = self.genDotaccess(part)
+        elif isinstance(part, ArgAccess):
+            res = self.genArgAccess(part)
+        elif isinstance(part, ListAccess):
+            res = self.genListAccess(part)
+        elif isinstance(part, VarAccess):
+            res = part.varName.value
+        elif isinstance(part, Number):
+            res = self.genNumber(part)
+        elif isinstance(part, String):
+            res = self.genString(part)
+        elif isinstance(part, BinOpNode):
+            res = f'({self.genBinOp(part.left, part.op, part.right)})'
+        elif isinstance(part, UnaryNode):
+            res = self.genUnaryOp(part.op, part.node)
+        elif isinstance(part, str):
+            res = part
+        else:
+            res = part.value.value
+
+        return res
+
+    def convertType2String(self, type):
+        if type == BYT:
+            return 'byte'
+        elif type == FLT:
+            return 'float'
+        elif type == INT:
+            return 'int'
+        elif type == DBL:
+            return 'double'
+        elif type == BOL:
+            return 'bool'
+        elif type == STR:
+            return 'string'
+        elif type == CHR:
+            return 'char'
+        elif type == TYP:
+            return 'Type'
+        else:
+            return 'object'
+
+    def genBodyParts(self, part):
+        if isinstance(part, DotAccess):
+            self.write(f'\n{self.genDotaccess(part)};')
+            return None
+        elif isinstance(part, ArgAccess):
+            self.write(f'\n{part.name}({self.genArgs(part)});')
+            return None
+        elif isinstance(part, BinOpNode):
+            self.write(f'\n{self.genBinOp(part.left, part.op, part.right)};')
+            return None
+        elif isinstance(part, ReasignVar):
+            if isinstance(part.name, str):
+                self.write(
+                    f'\n{self.genReasign(part.name, part.op, part.value)};')
+            else:
+                self.write(
+                    f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
+            return None
+        elif isinstance(part, Variable):
+            self.genVariable(part, True)
+            return None
+        elif isinstance(part, Function):
+            error = self.genFunc(part)
+            if error:
+                error
+            return None
+        elif isinstance(part, Return):
+            self.genReturn(part)
+            return None
+        elif isinstance(part, Break):
+            self.genBreak()
+            return None
+        elif isinstance(part, Continue):
+            self.genContinue()
+            return None
+        elif isinstance(part, For):
+            error = self.genForLoop(part)
+            if error:
+                error
+            return None
+        elif isinstance(part, While):
+            self.genWhileLoop(part)
+            return None
+        elif isinstance(part, If):
+            self.genIf(part)
+            return None
+        
+        return Error(f'Unknown instruction: couldn\'t compile the instruction properly.', COMP2CSHARPERROR,
+                     Position(-1, -1, -1, '', ''), '<comiler>')
+
+    def compile(self):
+        # Write all the basic data into the script
+        for data in self.basicData:
+            self.write(data)
+            self.write('\n')
+        self.write('\n' + '/' * 200)
+
+        # Start with libs
+        for lib in self.ms.libs:
+            self.write('\n\n')
+            self.write(
+                f'namespace {lib.name} ' + '\n{\n')
+
+            # Generate all script classes
+            for script in lib.scripts:
+                error = self.genScript(script)
+                if error:
+                    return error
+            self.write('\n}\n')
+
+        print('Successfully compiled the project!')
+        return None
+
+    def genScript(self, script):
+        self.write(f'namespace {script.name}' + '\n{\n')
+
+        # Give necessary information to the compiler
+        for _class in script.global_classes:
+            if (_class.name.value in self.classes):
+                return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+            self.classes.append(_class.name.value)
+            
+        for struct in script.global_structs:
+            if (struct.name.value in self.structs):
+                return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+            self.structs.append(struct.name.value)
+
+        # imports
+        for imp in script.imports:
+            self.write(f'\nusing {imp.value};')
+
+        # global_variables
+        for var in script.global_variables:
+            error = self.genVariable(var)
+            if error:
+                return error
+
+        # namespaces
+        for namespace in script.namespaces:
+            error = self.genNamespace(namespace)
+            if error:
+                return error
+
+        # classes
+        for _class in script.global_classes:
+            error = self.genClass(_class)
+            if error:
+                return error
+
+        # structs
+        for struct in script.global_structs:
+            error = self.genStruct(struct)
+            if error:
+                return error
+
+        self.write('\n}')
+        return None
+
+    def genNamespace(self, namespace):
+        self.write(f'\nnamespace {namespace.name.value}' + '\n{\n')
+
+        # Give necessary information to the compiler
+        for _class in namespace.classes:
+            if (_class.name.value in self.classes):
+                return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+            self.classes.append(_class.name.value)
+            
+        for struct in namespace.structs:
+            if (struct.name.value in self.structs):
+                return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+            self.structs.append(struct.name.value)
+
+        
+        # child namespaces
+        for childNamespace in namespace.childSpaces:
+            error = self.genNamespace(childNamespace)
+            if error:
+                return error
+
+        # classes
+        for _class in namespace.classes:
+            error = self.genClass(_class)
+            if error:
+                return error
+
+        # structs
+        for struct in namespace.structs:
+            error = self.genStruct(struct)
+            if error:
+                return error
+
+        self.write('\n}')
+        return None
+
+    def genClass(self, _class):
+        attributes = ''
+        attributes += 'public ' if _class.public else 'private '
+        attributes += 'static ' if _class.static else ''
+        self.write(f'\nnamespace {_class.name.value}' + '\n{\n')
+
+        # using
+        for using in _class.externNameSpaces:
+            error = self.genUsing(using)
+            if error:
+                return error
+        self.write('\n')
+
+        self.write(f'\n{attributes}class {_class.name.value}' + '\n{\n')
+
+        # variables
+        for var in _class.variables:
+            error = self.genVariable(var)
+            if error:
+                return error
+
+        # constructors
+        for constructor in _class.constructors:
+            error = self.genConstructor(constructor, _class)
+            if error:
+                return error
+
+        # body
+        for part in _class.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+
+        self.write('\n}')
+        self.write('\n}')
+        return None
+
+    def genStruct(self, struct):
+        self.write(f'\nnamespace {struct.name.value}' + '\n{\n')
+
+        # using
+        for using in struct.externNameSpaces:
+            error = self.genUsing(using)
+            if error:
+                return error
+        self.write('\n')
+
+        self.write(f'\nstruct {struct.name.value}' + '\n{\n')
+
+        # variables
+        for var in struct.variables:
+            error = self.genVariable(var)
+            if error:
+                return error
+
+        # constructors
+        for constructor in struct.constructors:
+            error = self.genConstructor(constructor, struct)
+            if error:
+                return error
+
+        self.write('\n}')
+        self.write('\n}')
+        return None
+
+    def genConstructor(self, constructor, parent):
+        self.write(f'\npublic {parent.name.value}(')
+
+        currIdx = 0
+        maxIdx = len(constructor.args)
+        for arg in constructor.args:
+            type = self.convertType2String(arg.type.value)
+            self.write(f'{type} {arg.name.value}')
+
+            currIdx += 1
+            if currIdx < maxIdx:
+                self.write(', ')
+        self.write(')\n{\n')
+
+        # variables
+        for var in constructor.variables:
+            error = self.genVariable(var, True)
+            if error:
+                return error
+
+        # body
+        for part in constructor.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+
+        self.write('\n}')
+        return None
+
+    def genFunc(self, func):
+        attributes = ''
+        attributes += 'public ' if func.public else 'private '
+        attributes += 'static ' if func.static else ''
+        attributes += 'protected ' if func.protected else ''
+        self.write(f'\n{attributes}{func.returnType.value} {func.name.value}(')
+
+        currIdx = 0
+        maxIdx = len(func.args)
+        for arg in func.args:
+            type = self.convertType2String(arg.type.value)
+            self.write(f'{type} {arg.name.value}')
+
+            currIdx += 1
+            if currIdx < maxIdx:
+                self.write(', ')
+        self.write(')\n{\n')
+
+        # variables
+        for var in func.variables:
+            error = self.genVariable(var, True)
+            if error:
+                return error
+
+        # body
+        for part in func.body:
+            error = self.genBodyParts(part)
+            if error:
+                return error
+
+        self.write('\n}')
+        return None
+
+    def genVariable(self, var, inBody=False, _return=False):
+        # Setup variable
+        attributes = ''
+        attributes += 'public ' if var.public and not inBody else ''
+        attributes += 'private ' if not var.public and not inBody else ''
+        attributes += 'static ' if var.static else ''
+        attributes += 'const ' if var.const else ''
+        if isinstance(var, List):
+            self.write(
+                f'\n{attributes}{self.convertType2String(var.type)}[] {var.name}')
+
+            if isinstance(var.elements, ListSpace):
+                if not var.elements.elements == None:
+                    self.write(' = {')
+
+                    currIdx = 0
+                    maxIdx = len(var.elements.elements)
+                    for e in var.elements.elements:
+                        currIdx += 1
+
+                        self.write(f' {self.genOperationPart(e)}')
+                        if currIdx < maxIdx:
+                            self.write(',')
+
+                    self.write(' };')
+                else:
+                    self.write(f' = new {var.type}[{var.elements.length}];')
+            else:
+                print('Other list value type! Unexpected!!!!')
+
+            return None
+        
+        variable = f'{attributes}{self.convertType2String(var.type)} {var.name}'
+
+        if isinstance(var.value, AccessPoint):
+            if isinstance(var.value, ArgAccess):
+                Var = var.value.name
+                res = Var if not Var in self.classes and not Var in self.structs else f'{Var}.{Var}'
+                variable += f' = {res}({self.genArgs(var.value)});';
+            elif isinstance(var.value, DotAccess):
+                variable += f' = {self.genDotaccess(var.value)};'
+            elif isinstance(var.value, ListAccess):
+                variable += f' = {self.genListAccess(var.value)};'
+            elif isinstance(var.value, VarAccess):
+                variable += f' = {var.value.varName.value};'
+        else:
+            if var.value:
+                if isinstance(var.value, String):
+                    variable += f' = {self.genString(var.value)};'
+                elif isinstance(var.value, Number):
+                    variable += f' = {self.genNumber(var.value)};'
+                elif isinstance(var.value, str):
+                    variable += f' = {var.value};'
+                elif isinstance(var.value, BinOpNode):
+                    variable += f' = {self.genOperationPart(var.value)};'
+                elif isinstance(var.value, UnaryNode):
+                    variable += f' = {self.genOperationPart(var.value)};'
+                else:
+                    variable += f' = {var.value.value.value};'
+            else:
+                variable += ';'
+
+        if _return:
+            return variable
+        else:
+            self.write('\n' + variable)
+            
+        return None
+
+####################
 # - Run Function - #
 ####################
 
 
 def run(fn, text):
     # Reset data
-    global masterscript, metacode
+    global masterscript, metacode, outputdir, projectdir
     masterscript = MasterScript([])
     metacode = []
 
@@ -3241,12 +4458,40 @@ def run(fn, text):
     lexer = Lexer(fn, text)
     tokens, error = lexer.genTokens()
     if error:
-        return None, error
+        return error
 
     # Parsing
     parser = Parser(fn, tokens)
     ast = parser.parse()
+    if ast.error:
+        return ast.error
 
-    return ast.node, ast.error
+    # Compiling
+    #compiler = compile2python(masterscript, outputdir, projectdir)
+    compiler = compile2Csharp(masterscript, outputdir, projectdir)
+    error = compiler.compile()
+    if error:
+        return error
+
+    # That's something for compile2python:
+    # compiler.checkPaths()
+
+    return None
 
 
+# TODOs (compile2python):
+#
+# - make sure the libraries of all scripts get compined if they have the same name!
+# - constructors
+# - lists
+# - make new 'pathfinding' algorithm
+# - currently everything is allways accassable!
+# - refactor the dotproduct > make a 'getVar()' function that return the requested varaible if possible (checks for the variables existance, static "state" and so on...)
+# - metacode
+#
+
+# TODOs (compile2csharp):
+#
+# - OverrideFunction
+# - Metacode
+#
