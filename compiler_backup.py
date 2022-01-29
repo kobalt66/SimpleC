@@ -4359,16 +4359,19 @@ class compile2Csharp:
         attributes += 'protected ' if func.protected else ''
         self.write(f'\n{attributes}{func.returnType.value} {func.name.value}(')
 
-        currIdx = 0
-        maxIdx = len(func.args)
-        for arg in func.args:
-            type = self.convertType2String(arg.type.value)
-            self.write(f'{type} {arg.name.value}')
+        if func.name.value == 'Main':
+            self.write('string[] args)')
+        else:
+            currIdx = 0
+            maxIdx = len(func.args)
+            for arg in func.args:
+                type = self.convertType2String(arg.type.value)
+                self.write(f'{type} {arg.name.value}')
 
-            currIdx += 1
-            if currIdx < maxIdx:
-                self.write(', ')
-        self.write(')\n{\n')
+                currIdx += 1
+                if currIdx < maxIdx:
+                    self.write(', ')
+            self.write(')\n{\n')
 
         # variables
         for var in func.variables:
