@@ -3802,8 +3802,9 @@ class compile2python:
 ################################################################################################################################################################################
 
 class constant:
-    def __init__(self, lib, name, type, value):
-        self.lib = lib
+    def __init__(self, script, accessibility, name, type, value):
+        self.script = script
+        self.accessibility = accessibility
         self.name = name
         self.type = type
         self.value = value
@@ -3820,6 +3821,7 @@ class compile2Csharp:
         self.outputFile = f'{self.outputdir}output.cs'
 
         # keeping track of names
+        self.currScript = ''
         self.classes = []
         self.structs = []
         self.constants = []
@@ -3969,8 +3971,12 @@ class compile2Csharp:
     def genVarAccess(self, var):
         value = var.varName.value
         for const in self.constants:
-            if const.name == value:
-                return f'___Global___.{const.lib}_{value}'
+            if const.accessibility:
+                if const.name == value:
+                    return f'___Global___.{const.script.lib}_{value}'
+            if not const.accessibility:
+                if const.name == value and const.script.name == self.currScript:
+                    return f'___Global___.{const.script.lib}_{const.script.name}_{value}'
         return value 
 
     def genUnaryOp(self, op, node):
@@ -4179,6 +4185,7 @@ class compile2Csharp:
 
             # Generate all script classes
             for script in lib.scripts:
+                self.currScript = script.name
                 error = self.genScript(script)
                 if error:
                     return error
@@ -4187,7 +4194,9 @@ class compile2Csharp:
         # Generating the global class
         self.write(f'\npublic static class ___Global___' + '\n{\n')
         for const in self.constants:
-            self.write(f'\npublic static {const.type} {const.lib}_{const.name} = {const.value};')
+            tokens = const.script.lib
+            tokens += '_' + const.script.name if not const.accessibility else ''
+            self.write(f'\npublic static {const.type} {tokens}_{const.name} = {const.value};')
         self.write('\n}')
         
         print('Successfully compiled the project!')
@@ -4215,7 +4224,7 @@ class compile2Csharp:
 
         # global_variables
         for var in script.global_variables:
-            self.genGlobalVar(script.lib, var)
+            self.genGlobalVar(script, var)
 
         # namespaces
         for namespace in script.namespaces:
@@ -4487,12 +4496,12 @@ class compile2Csharp:
             
         return None
 
-    def genGlobalVar(self, lib, var):
+    def genGlobalVar(self, script, var):
         name = var.name
         type = self.getVarType(var)
         value = self.getVarValue(var)
         
-        self.constants.append(constant(lib, name, type, value))
+        self.constants.append(constant(script, var.public, name, type, value))
         
 ####################
 # - Run Function - #
@@ -4545,5 +4554,7 @@ def run(fn, text):
 #
 # - OverrideFunction
 # - Metacode
+# - Cannot have private classes
+# - Cannot have global vars can only be accessed by the script
 #
 
