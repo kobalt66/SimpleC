@@ -179,6 +179,7 @@ LBRACKET = '('
 RBRACKET = ')'
 ENDCOLUMN = ';'
 COMMA = ','
+EQEQ = '=='
 EOF = 'endofFile'
 
 LETTERS = string.ascii_letters
@@ -3943,7 +3944,7 @@ class compile2Csharp:
         return f'{op.value}{self.genOperationPart(node)}'
 
     def genBinOp(self, left, op, right):
-        return f'{self.genOperationPart(left)} {op.value} {self.genOperationPart(right)}'
+        return f'{self.genOperationPart(left)} {op.value if not op.value == ISEQUALTO else EQEQ} {self.genOperationPart(right)}'
 
     def genReasign(self, name, op, value):
         if op.value == PLUSPLUS:
