@@ -2890,6 +2890,11 @@ class Parser:
             if res.error:
                 return res
 
+            if type == VAR and isinstance(value, ListSpace):
+                type = value.elements[0].getType()
+                if type == AGA:
+                    type = value.elements[0].name
+            
             return res.success(List(None, None, None, False, False, False, type, name, value, self.currTok.start, self.currTok.end))
 
         if not self.currTok.type == IDENTIFIER:
@@ -2917,7 +2922,7 @@ class Parser:
         value = res.register(self.expr())
         if res.error:
             return res
-
+        
         if not self.currTok.type == ENDCOLUMN:
             return res.failure(
                 Error(
@@ -4102,6 +4107,8 @@ class compile2Csharp:
             return 'Type'
         elif type == VAR:
             return 'object'
+        elif isinstance(type, str):
+            return type + '.' + type
         else:
             return type.value + '.' + type.value
 
