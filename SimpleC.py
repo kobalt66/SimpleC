@@ -3813,7 +3813,8 @@ class compile2Csharp:
             'using System.Collections;',
             'using System.Collections.Generic;',
             ' ',
-            'public const object lengthof = (list) => { return (list as Array).Length; };'
+            'public const object lengthof = list => { return (list as Array).Length; };',
+            'public const object sqrt = value => { return Math.Sqrt(value); };'
         ]
 
         # Setup output.py
@@ -4495,3 +4496,4 @@ def run(fn, text):
 # - OverrideFunction
 # - Metacode
 #
+
