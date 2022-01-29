@@ -13,6 +13,7 @@
 ##############################################################################################
 
 
+from ast import BinOp
 from typing import Counter
 import string
 import os
@@ -1250,7 +1251,7 @@ class Parser:
                     return res
 
                 if metaNode.type == LIB:
-                    lib = metaNode.identifier
+                    lib = metaNode.value
                 elif metaNode.type == IMPORT:
                     imports.append(metaNode)
                 else:
@@ -3891,7 +3892,9 @@ class compile2Csharp:
         return value
 
     def genArgAccess(self, access):
-        res = f'{access.name}('
+        Var = access.name
+        value = Var if not Var in self.classes and not Var in self.structs else f'{Var}.{Var}'
+        res = f'{value}('
 
         currIdx = 0
         maxIdx = len(access.args)
@@ -3918,7 +3921,7 @@ class compile2Csharp:
         value = ''
 
         currIdx = 0
-        currAccess = var
+        currAccess = var 
         while isinstance(currAccess, DotAccess) and currAccess.parent.value:
             value += '.' if currIdx > 0 else ''
             currIdx += 1
@@ -4079,16 +4082,13 @@ class compile2Csharp:
 
     def genBodyParts(self, part):
         if isinstance(part, DotAccess):
-            self.write(f'{self.genDotaccess(part)};')
+            self.write(f'\n{self.genDotaccess(part)};')
             return None
         elif isinstance(part, ArgAccess):
-            self.write(f'{part.name}({self.genArgs(part)});')
+            self.write(f'\n{part.name}({self.genArgs(part)});')
             return None
         elif isinstance(part, BinOpNode):
             self.write(f'\n{self.genBinOp(part.left, part.op, part.right)};')
-            return None
-        elif isinstance(part, List):
-            self.genList(part, True)
             return None
         elif isinstance(part, ReasignVar):
             if isinstance(part.name, str):
@@ -4203,6 +4203,20 @@ class compile2Csharp:
     def genNamespace(self, namespace):
         self.write(f'\nnamespace {namespace.name.value}' + '\n{\n')
 
+        # Give necessary information to the compiler
+        for _class in namespace.classes:
+            if (_class.name.value in self.classes):
+                return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+            self.classes.append(_class.name.value)
+            
+        for struct in namespace.structs:
+            if (struct.name.value in self.structs):
+                return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
+                         Position(-1, -1, -1, '', ''), '<comiler>')
+            self.structs.append(struct.name.value)
+
+        
         # child namespaces
         for childNamespace in namespace.childSpaces:
             error = self.genNamespace(childNamespace)
@@ -4404,6 +4418,8 @@ class compile2Csharp:
                     variable += f' = {self.genNumber(var.value)};'
                 elif isinstance(var.value, str):
                     variable += f' = {var.value};'
+                elif isinstance(var.value, BinOpNode):
+                    variable += f' = {self.genOperationPart(var.value)};'
                 else:
                     variable += f' = {var.value.value.value};'
             else:
@@ -4452,7 +4468,7 @@ def run(fn, text):
     return None
 
 
-# TODOs:
+# TODOs (compile2python):
 #
 # - make sure the libraries of all scripts get compined if they have the same name!
 # - constructors
@@ -4461,5 +4477,11 @@ def run(fn, text):
 # - currently everything is allways accassable!
 # - refactor the dotproduct > make a 'getVar()' function that return the requested varaible if possible (checks for the variables existance, static "state" and so on...)
 # - metacode
+#
+
+# TODOs (compile2csharp):
+#
+# - OverrideFunction
+# - Metacode
 #
 
