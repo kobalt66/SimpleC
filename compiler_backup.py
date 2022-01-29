@@ -3904,7 +3904,7 @@ class compile2Csharp:
 
     def genArgAccess(self, access):
         Var = access.name
-        value = Var if not Var in self.classes and not Var in self.structs else f'{Var}.{Var}'
+        value = Var if not Var in self.classes and not Var in self.structs else f'new {Var}.{Var}'
         res = f'{value}('
 
         currIdx = 0
@@ -3958,6 +3958,13 @@ class compile2Csharp:
 
     def genListAccess(self, var):
         return f'{var.name}[{var.elementIdx.value}]'
+
+    def genVarAccess(self, var):
+        value = var.varName.value
+        for const in self.constants:
+            if const.name == value:
+                return f'___Global___.{const.lib}_{value}'
+        return value 
 
     def genUnaryOp(self, op, node):
         return f'{op.value}{self.genOperationPart(node)}'
@@ -4060,7 +4067,7 @@ class compile2Csharp:
         elif isinstance(part, ListAccess):
             res = self.genListAccess(part)
         elif isinstance(part, VarAccess):
-            res = part.varName.value
+            res = self.genVarAccess(part)
         elif isinstance(part, Number):
             res = self.genNumber(part)
         elif isinstance(part, String):
@@ -4358,7 +4365,7 @@ class compile2Csharp:
         attributes = ''
         attributes += 'public ' if func.public else 'private '
         attributes += 'static ' if func.static else ''
-        attributes += 'protected ' if func.protected else ''
+        #attributes += 'protected ' if func.protected else ''
         self.write(f'\n{attributes}{func.returnType.value} {func.name.value}(')
 
         if func.name.value == 'Main':
@@ -4394,7 +4401,13 @@ class compile2Csharp:
         return self.convertType2String(var.value.type)
     
     def getVarValue(self, var):
-        return var.value.value.value
+        value = var.value.value.value
+        if var.value.type == FLT:
+            return str(value) + 'f'
+        elif isinstance(value, str):
+            return f'"{value}"' if len(value) > 1 else f"'{value}'"
+        else:
+            return var.value.value.value
 
     def genVariable(self, var, inBody=False, _return=False):
         # Setup variable
@@ -4433,14 +4446,14 @@ class compile2Csharp:
         if isinstance(var.value, AccessPoint):
             if isinstance(var.value, ArgAccess):
                 Var = var.value.name
-                res = Var if not Var in self.classes and not Var in self.structs else f'{Var}.{Var}'
+                res = Var if not Var in self.classes and not Var in self.structs else f'new {Var}.{Var}'
                 variable += f' = {res}({self.genArgs(var.value)});';
             elif isinstance(var.value, DotAccess):
                 variable += f' = {self.genDotaccess(var.value)};'
             elif isinstance(var.value, ListAccess):
                 variable += f' = {self.genListAccess(var.value)};'
             elif isinstance(var.value, VarAccess):
-                variable += f' = {var.value.varName.value};'
+                variable += f' = {self.genVarAccess(var.value)};'
         else:
             if var.value:
                 if isinstance(var.value, String):
