@@ -13,7 +13,7 @@
 ##############################################################################################
 
 
-from ast import BinOp
+from ast import BinOp, UnaryOp
 from typing import Counter
 import string
 import os
@@ -3882,7 +3882,11 @@ class compile2Csharp:
                 if isinstance(arg, String):
                     value += f'\'{arg.value.value}\''
                 elif isinstance(arg, Bool):
-                    value += f'{str(arg.value.value).capitalize()}'
+                    value += f'{str(arg.value.value)}'
+                elif isinstance(arg, BinOpNode):
+                    value += f'{self.genOperationPart(arg)}'
+                elif isinstance(arg, UnaryNode):
+                    value += f'{self.genOperationPart(arg)}'
                 else:
                     value += f'{arg.value.value}'
 
@@ -4425,6 +4429,8 @@ class compile2Csharp:
                     variable += f' = {var.value};'
                 elif isinstance(var.value, BinOpNode):
                     variable += f' = {self.genOperationPart(var.value)};'
+                elif isinstance(var.value, UnaryNode):
+                    variable += f' = {self.genOperationPart(var.value)};'
                 else:
                     variable += f' = {var.value.value.value};'
             else:
@@ -4488,6 +4494,5 @@ def run(fn, text):
 #
 # - OverrideFunction
 # - Metacode
-# - position.y -= force; doesn't work
 #
 
