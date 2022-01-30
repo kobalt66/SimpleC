@@ -12,9 +12,6 @@
 # I hope you enjoy my language :)                                                            #
 ##############################################################################################
 
-
-from ast import BinOp, UnaryOp
-from typing import Counter
 import string
 import os
 import numpy
@@ -1193,9 +1190,13 @@ metacode = None
 
 class Parser:
     def __init__(self, scriptName, tokens):
+        global metacode
+        metacode = []
+        
         self.tokens = tokens
         self.scriptName = scriptName
         self.idx = -1
+        
         self.advance()
 
     def reverse(self, amount=1):
@@ -3260,6 +3261,12 @@ class Parser:
 
         return res.success(left)
 
+def getUsedScriptNames():
+    pass
+
+def parseProject(scriptList):
+    pass
+
 
 ####################
 # - The compiler - #
@@ -4527,7 +4534,6 @@ def run(fn, text):
     # Reset data
     global masterscript, metacode, outputdir, projectdir
     masterscript = MasterScript([])
-    metacode = []
 
     # Lexing
     lexer = Lexer(fn, text)
@@ -4540,6 +4546,10 @@ def run(fn, text):
     ast = parser.parse()
     if ast.error:
         return ast.error
+
+    # Parsing rest of the Project
+    scriptList = getUsedScriptNames()
+    parseProject(scriptList)
 
     # Compiling
     #compiler = compile2python(masterscript, outputdir, projectdir)
