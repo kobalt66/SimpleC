@@ -1,18 +1,23 @@
 import SimpleC
+from SimpleC import openFile, fileType
+outputData = None
 
 
-def openFile(fn):
-    try:
-        with open(fn, "r") as f:
-            script = f.read()
-            return script, None
-    except Exception as e:
-        return None, SimpleC.Error(e, SimpleC.PYTHON_EXCEPTION, -1, -1, fn)
+def setOutputdir(dir):
+    SimpleC.outputdir = dir
+
+
+def setProjectdir(dir):
+    SimpleC.projectdir = dir
+
+def retrunData():
+    return outputData
+
+
+setProjectdir('Test Project/scripts')
 
 
 while True:
-    result = None 
-    error = None
     script = ''
     fn = ''
     text = input('[@] > ')
@@ -23,15 +28,20 @@ while True:
         fn = input('[FileName] > ')
         if fn.strip() == "":
             continue
-        
-        script, error = openFile(fn)
+
+        script, error = openFile(fn + fileType)
         if error:
             error.throw()
-        result, error = SimpleC.run(f'<{fn}>', script)
+        error = SimpleC.run(f'{fn}', script)
     else:
-        result, error = SimpleC.run("<Test.sc>", text)
+        error = SimpleC.run("console", text)
 
-    if result:
-        print(result)
-    elif error:
+    if error:
         error.throw()
+        outputData = "Something went wrong! (No data received)"
+
+    # if result:
+    #     print(result)
+    #     print('\n\n\t => Everything worked!')
+    # elif error:
+    #     error.throw()
