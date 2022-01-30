@@ -3904,12 +3904,12 @@ class compile2Csharp:
         if isinstance(using.name, VarAccess):
             self.usings.append(using.name.varName.value)
             self.write(
-                f'using {using.name.varName.value};')
+                f'\nusing {using.name.varName.value};')
         elif isinstance(using.name, DotAccess):
             dotAccess = self.genDotaccess(using.name)
             self.usings.append(dotAccess)
             self.write(
-                f'using {dotAccess};')
+                f'\nusing {dotAccess};')
         else:
             return Error(f'You can only use a varaccess point inside a using expression.', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
@@ -4616,6 +4616,6 @@ def run(fn, text):
 # - OverrideFunction
 # - Metacode
 # - Cannot have private classes
-# - Fix Useless_program bug! List is broken
+# - Import is kind of broken? Importing another lib will not give access to it.
 #
 
