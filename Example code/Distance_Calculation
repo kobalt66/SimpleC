@@ -1,14 +1,14 @@
 #lib = "std"
 
-namespace std
+namespace stdspace
 {
     namespace physics
     {
         struct Vec2
         {
-            flt x;
-            flt y;
-            constructor(flt X, flt X)
+            dbl x;
+            dbl y;
+            constructor(dbl X, dbl Y)
             {
                 x = X;
                 y = Y;
@@ -16,50 +16,48 @@ namespace std
         }
         struct Vec3
         {
-            flt x;
-            flt y;
-            flt z;
-            constructor(flt x, flt y, flt z) 
-                : x(x), y(y), z(z) {}
+            dbl x;
+            dbl y;
+            dbl z;
+            constructor(dbl X , dbl Y, dbl Z) : x(X), y(Y), z(Z)
         }
         struct Vec4
         {
-            flt x;
-            flt y;
-            flt z;
-            flt w;
-            constructor(flt x , flt y, flt z, flt w) 
-                : x(x), y(y), z(z), w(w) {}
+            dbl x;
+            dbl y;
+            dbl z;
+            dbl w;
+            constructor(dbl X , dbl Y, dbl Z, dbl W) : x(X), y(Y), z(Z), w(W)
         }
     }
 }
 
-private class Program
+public class Program
 {
-    using std.physics;
-    private function int main(var args)
+    using stdspace.physics.Vec2;
+    private static function void Main(var args)
     {
         // Create points.
-        Var2 one = Var2(1, 2);
-        Var2 two = Var2(2, 3);
+        Vec2 one = Vec2(1, 2);
+        Vec2 two = Vec2(2, 3);
 
         // Calculation.
-        flt distance = calculate_DistanceVECtwo(one, two);
-
-        return 1;
+        dbl distance = calculate_DistanceVECtwo(one, two);
+        Console.WriteLine(distance);
+        return;
     }
 
-    private function flt calculate_DistanceVECtwo(var a, var b)
+    private static function dbl calculate_DistanceVECtwo(Vec2 a, Vec2 b)
     {
         // Checking if the two points are two dimensional.
-        bol check1 = !isClass(a, Vec2);
+        /*bol check1 = !isClass(a, Vec2);
         bol check2 = !isClass(b, Vec2);
-        if (check1 | check2) return;
+        if (check1 | check2) return;*/
 
         // Calculating the distance between two points.
-        flt res1 = sqrt(b.y - a.y);
-        flt res2 = sqrt(b.x - a.x);
-        flt distance = res1 + res2;
+        dbl res1 = Math.Sqrt((b.y - a.y) * (b.y - a.y));
+        dbl res2 = Math.Sqrt((b.x - a.x) * (b.x - a.x));
+        dbl distance = res1 + res2;
 
         return distance;
     }
