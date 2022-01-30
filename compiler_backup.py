@@ -3939,6 +3939,8 @@ class compile2Csharp:
                 res += self.genVarAccess(param)
             elif isinstance(param, DotAccess):
                 res += self.genDotaccess(param)
+            elif isinstance(param, BinOpNode):
+                res += self.genBinOp(param.left, param.op, param.right)
             else:
                 res += param.value.value
 
