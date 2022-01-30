@@ -26,15 +26,16 @@ import random
 #############################
 
 # Variable types
-VAR = 'var'  # [variable]
-BYT = 'byt'  # [byte]
-CHR = 'chr'  # [character]
-STR = 'str'  # [string]
-INT = 'int'  # [integer]
-FLT = 'flt'  # [floating point]
-DBL = 'dbl'  # [double]
-BOL = 'bol'  # [boolean]
-TYP = 'typ'  # [type]
+VAR = 'var'   # [variable]
+BYT = 'byt'   # [byte]
+CHR = 'chr'   # [character]
+STR = 'str'   # [string]
+INT = 'int'   # [integer]
+FLT = 'flt'   # [floating point]
+DBL = 'dbl'   # [double]
+BOL = 'bol'   # [boolean]
+TYP = 'typ'   # [type]
+LIST = 'list' # [array]
 
 VARTYPE = 'VARIABLE'
 VARTYPES = [
@@ -46,7 +47,8 @@ VARTYPES = [
     FLT,
     DBL,
     BOL,
-    TYP
+    TYP,
+    LIST
 ]
 
 # Keywords
@@ -208,7 +210,8 @@ FUNCTYPES = [
     FLT,
     DBL,
     BOL,
-    TYP
+    TYP,
+    LIST
 ]
 
 
@@ -832,9 +835,10 @@ class List:
 
 
 class ListSpace:
-    def __init__(self, length, elements):
+    def __init__(self, length, elements, listType):
         self.length = length
         self.elements = elements
+        self.listType = listType
 
     def __repr__(self):
         return f'\n\tListSpace Node: \n\t\tLength > {self.length}\n\t\tElements > {self.elements}'
@@ -2760,19 +2764,11 @@ class Parser:
             res.registerAdvance()
             self.advance()
 
-            if not self.currTok.type == INT:
-                if self.currTok.type == RSBRACKET:
-                   self.reverse(2)
-                   var = res.register(self.defVar())
-                   if res.error:
-                       return res
-                   
-                   return res.success(var)
-                if not self.currTok.type == IDENTIFIER:
-                    return res.failure(
-                        Error(
-                            "Expected integer or identifier.", SYNTAXERROR,
-                            self.currTok.start, self.scriptName))
+            if not self.currTok.type in (INT, IDENTIFIER):
+                return res.failure(
+                    Error(
+                        "Expected integer or identifier.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
 
             idx = self.currTok
             res.registerAdvance()
@@ -2864,7 +2860,13 @@ class Parser:
         res.registerAdvance()
         self.advance()
 
-        if self.currTok.type == LSBRACKET:
+        if type == LIST:
+            if not self.currTok.type == LSBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '['.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+                
             res.registerAdvance()
             self.advance()
 
@@ -2900,7 +2902,7 @@ class Parser:
             if res.error:
                 return res
                         
-            return res.success(List(None, None, None, False, False, False, type, name, value, self.currTok.start, self.currTok.end))
+            return res.success(List(None, None, None, False, False, False, value.listType, name, value, self.currTok.start, self.currTok.end))
 
         if not self.currTok.type == IDENTIFIER:
             return res.failure(
@@ -2939,7 +2941,9 @@ class Parser:
     def listElements(self):
         res = ParseResult()
 
+        listType = LIST
         if self.currTok.type == VARTYPE:
+            listType = self.currTok.value
             res.registerAdvance()
             self.advance()
 
@@ -2977,7 +2981,7 @@ class Parser:
                         "Expected ';'.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
 
-            return res.success(ListSpace(length, None))
+            return res.success(ListSpace(length, None, listType))
 
         if not self.currTok.type == LCBRACKET:
             return res.failure(
@@ -3005,19 +3009,21 @@ class Parser:
                 return res
 
             elements.append(element)
-
+            listType = element.type.value if isinstance(element, Variable) else listType
+            listType = element.name if isinstance(element, ArgAccess) else listType
+            
             if self.currTok.type == COMMA:
                 continue
 
             if not self.currTok.type == RCBRACKET:
-                return res.failure(
+                return None, res.failure(
                     Error(
                         "Expected '}'.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
             else:
                 break
 
-        return res.success(ListSpace(len(elements), elements))
+        return res.success(ListSpace(len(elements), elements, listType))
 
     def atom(self):
         res = ParseResult()
@@ -3925,7 +3931,8 @@ class compile2Csharp:
 
     def genArgAccess(self, access):
         Var = access.name
-        value = Var if not Var in self.classes and not Var in self.structs or not self.isAccessingClass(Var) else f'new {Var}.{Var}'
+        value = 'new ' if Var in self.classes or Var in self.structs else ''
+        value = Var if not Var in self.classes and not Var in self.structs or self.isAccessingClass(Var) else f'new {Var}.{Var}'
         res = f'{value}('
 
         currIdx = 0
@@ -4156,7 +4163,7 @@ class compile2Csharp:
                 self.write(
                     f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
             return None
-        elif isinstance(part, Variable):
+        elif isinstance(part, Variable) or isinstance(part, List):
             self.genVariable(part, True)
             return None
         elif isinstance(part, Function):
