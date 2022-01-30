@@ -4062,7 +4062,7 @@ class compile2Csharp:
             self.write('\nelse\n{\n')
 
             # body
-            for part in _elif.body:
+            for part in If.elseCase.body:
                 error = self.genBodyParts(part)
                 if error:
                     return error
