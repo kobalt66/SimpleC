@@ -4563,6 +4563,6 @@ def run(fn, text):
 # - OverrideFunction
 # - Metacode
 # - Cannot have private classes
-# - Cannot have global vars can only be accessed by the script
+# - Fix Useless_program bug! List is broken
 #
 
