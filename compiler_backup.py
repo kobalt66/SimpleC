@@ -1744,7 +1744,8 @@ class Parser:
                 self.advance()
                 break
             if not self.currTok.type == VARTYPE:
-                return res.failure(
+                if not self.currTok.type == IDENTIFIER:
+                    return res.failure(
                     Error(
                         "Expected variable type.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
@@ -1863,7 +1864,7 @@ class Parser:
                             "'public', 'static' and 'const' are not allowed in a function.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
                 else:
-                    variables.append(statement)
+                    body.append(statement)
             elif isinstance(statement, Class) or isinstance(statement, Struct) or isinstance(statement, Function):
                 return res.failure(
                     Error(
@@ -1925,7 +1926,8 @@ class Parser:
                 self.advance()
                 break
             if not self.currTok.type == VARTYPE:
-                return res.failure(
+                if not self.currTok.type == IDENTIFIER:
+                    return res.failure(
                     Error(
                         "Expected variable type.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
@@ -1989,7 +1991,7 @@ class Parser:
                             "'public', 'static' and 'const' are not allowed in a function.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
                 else:
-                    variables.append(statement)
+                    body.append(statement)
             elif isinstance(statement, Class) or isinstance(statement, Struct) or isinstance(statement, Function):
                 return res.failure(
                     Error(
@@ -3823,6 +3825,7 @@ class compile2Csharp:
 
         # keeping track of names
         self.currScript = ''
+        self.usings = []
         self.classes = []
         self.structs = []
         self.constants = []
@@ -3853,12 +3856,20 @@ class compile2Csharp:
             print(f.read())
             f.close()
 
+    def isAccessingClass(self, varName):
+        for using in self.usings:
+            if varName in using:
+                return True
+        return False
+    
     def genUsing(self, using):
         if isinstance(using.name, VarAccess):
+            self.usings.append(using.name.varName.value)
             self.write(
                 f'using {using.name.varName.value};')
         elif isinstance(using.name, DotAccess):
             dotAccess = self.genDotaccess(using.name)
+            self.usings.append(dotAccess)
             self.write(
                 f'using {dotAccess};')
         else:
@@ -3883,7 +3894,7 @@ class compile2Csharp:
         for arg in var.args:
             currIdx += 1
             if isinstance(arg, VarAccess):
-                value += f'{arg.varName.value}'
+                value += f'{self.genVarAccess(arg)}'
             elif isinstance(arg, DotAccess):
                 currAccess = arg
                 while isinstance(currAccess, DotAccess) and currAccess.parent.value:
@@ -3914,7 +3925,7 @@ class compile2Csharp:
 
     def genArgAccess(self, access):
         Var = access.name
-        value = Var if not Var in self.classes and not Var in self.structs else f'new {Var}.{Var}'
+        value = Var if not Var in self.classes and not Var in self.structs or not self.isAccessingClass(Var) else f'new {Var}.{Var}'
         res = f'{value}('
 
         currIdx = 0
@@ -3925,7 +3936,7 @@ class compile2Csharp:
             elif isinstance(param, String):
                 res += self.genString(param)
             elif isinstance(param, VarAccess):
-                res += param.varName.value
+                res += self.genVarAccess(param)
             elif isinstance(param, DotAccess):
                 res += self.genDotaccess(param)
             else:
@@ -3978,6 +3989,8 @@ class compile2Csharp:
             if not const.accessibility:
                 if const.name == value and const.script.name == self.currScript:
                     return f'___Global___.{const.script.lib}_{const.script.name}_{value}'
+        
+        value = value if not value in self.classes and not value in self.structs or self.isAccessingClass(value) else f'{value}.{value}'
         return value 
 
     def genUnaryOp(self, op, node):
@@ -4116,10 +4129,12 @@ class compile2Csharp:
             return 'Type'
         elif type == VAR:
             return 'object'
+        elif type == VOID:
+            return 'void'
         elif isinstance(type, str):
-            return type + '.' + type
+            return type + '.' + type if not self.isAccessingClass(type) else type
         else:
-            return type.value + '.' + type.value
+            return type.value + '.' + type.value if not self.isAccessingClass(type.value) else type.value 
 
     def genBodyParts(self, part):
         if isinstance(part, DotAccess):
@@ -4293,6 +4308,7 @@ class compile2Csharp:
         self.write(f'\nnamespace {_class.name.value}' + '\n{\n')
 
         # using
+        self.usings = []
         for using in _class.externNameSpaces:
             error = self.genUsing(using)
             if error:
@@ -4365,12 +4381,6 @@ class compile2Csharp:
                 self.write(', ')
         self.write(')\n{\n')
 
-        # variables
-        for var in constructor.variables:
-            error = self.genVariable(var, True)
-            if error:
-                return error
-
         # body
         for part in constructor.body:
             error = self.genBodyParts(part)
@@ -4385,7 +4395,7 @@ class compile2Csharp:
         attributes += 'public ' if func.public else 'private '
         attributes += 'static ' if func.static else ''
         #attributes += 'protected ' if func.protected else ''
-        self.write(f'\n{attributes}{func.returnType.value} {func.name.value}(')
+        self.write(f'\n{attributes}{self.convertType2String(func.returnType.value)} {func.name.value}(')
 
         if func.name.value == 'Main':
             self.write('string[] args)\n{\n')
@@ -4400,12 +4410,6 @@ class compile2Csharp:
                 if currIdx < maxIdx:
                     self.write(', ')
             self.write(')\n{\n')
-
-        # variables
-        for var in func.variables:
-            error = self.genVariable(var, True)
-            if error:
-                return error
 
         # body
         for part in func.body:
@@ -4465,7 +4469,8 @@ class compile2Csharp:
         if isinstance(var.value, AccessPoint):
             if isinstance(var.value, ArgAccess):
                 Var = var.value.name
-                res = Var if not Var in self.classes and not Var in self.structs else f'new {Var}.{Var}'
+                res = 'new ' if Var in self.classes or Var in self.structs else ''
+                res += Var if not Var in self.classes and not Var in self.structs or self.isAccessingClass(Var) else f'{Var}.{Var}'
                 variable += f' = {res}({self.genArgs(var.value)});';
             elif isinstance(var.value, DotAccess):
                 variable += f' = {self.genDotaccess(var.value)};'
