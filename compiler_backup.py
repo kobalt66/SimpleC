@@ -189,6 +189,7 @@ FLOATMIN = 0.0000000000000001
 
 outputdir = ""
 projectdir = ""
+fileType = ".sc"
 
 # Extra types
 BON = 'binopnode'
@@ -3261,11 +3262,35 @@ class Parser:
 
         return res.success(left)
 
-def getUsedScriptNames():
-    pass
 
-def parseProject(scriptList):
-    pass
+def getUsedScripts(root):
+    global projectdir, fileType
+    files = os.listdir(projectdir)
+    print(files)
+    
+    for file in files:
+        name, extension = os.path.splitext(file)
+        if not extension == fileType or name == root:
+            continue
+        
+        script, error = openFile(name + fileType)
+        if error:
+            return error
+        if not '#lib' in script:
+            continue
+    
+        lexer = Lexer(name, script)
+        tokens, error = lexer.genTokens()
+        if error:
+            return error
+
+        # Parsing
+        parser = Parser(name, tokens)
+        ast = parser.parse()
+        if ast.error:
+            return ast.error
+
+    return None
 
 
 ####################
@@ -4240,13 +4265,13 @@ class compile2Csharp:
         # Give necessary information to the compiler
         for _class in script.global_classes:
             if (_class.name.value in self.classes):
-                return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
+                return Error(f'({self.currScript}) You\'re not allowed to define two classes with the same name [{_class.name.value}].', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
             self.classes.append(_class.name.value)
             
         for struct in script.global_structs:
             if (struct.name.value in self.structs):
-                return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
+                return Error(f'({self.currScript}) You\'re not allowed to define two structs with the same name [{struct.name.value}].', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
             self.structs.append(struct.name.value)
 
@@ -4285,13 +4310,13 @@ class compile2Csharp:
         # Give necessary information to the compiler
         for _class in namespace.classes:
             if (_class.name.value in self.classes):
-                return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
+                return Error(f'({self.currScript}) You\'re not allowed to define two classes with the same name [{_class.name.value}].', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
             self.classes.append(_class.name.value)
             
         for struct in namespace.structs:
             if (struct.name.value in self.structs):
-                return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
+                return Error(f'({self.currScript}) You\'re not allowed to define two structs with the same name [{struct.name.value}].', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
             self.structs.append(struct.name.value)
 
@@ -4530,6 +4555,16 @@ class compile2Csharp:
 ####################
 
 
+def openFile(fn):
+    try:
+        with open(f'{projectdir}/{fn}', "r") as f:
+            script = f.read()
+            f.close()
+            return script, None
+    except Exception as e:
+        return None, Error(e, PYTHON_EXCEPTION, Position(0, -1, -1, fn, ""), fn)
+
+
 def run(fn, text):
     # Reset data
     global masterscript, metacode, outputdir, projectdir
@@ -4548,8 +4583,9 @@ def run(fn, text):
         return ast.error
 
     # Parsing rest of the Project
-    scriptList = getUsedScriptNames()
-    parseProject(scriptList)
+    error = getUsedScripts(fn)
+    if error:
+        return error
 
     # Compiling
     #compiler = compile2python(masterscript, outputdir, projectdir)
