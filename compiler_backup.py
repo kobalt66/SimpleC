@@ -37,7 +37,6 @@ LST = 'lst' # [array]
 VARTYPE = 'VARIABLE'
 TYPEOF = 'typeof'
 VARTYPES = [
-    VAR,
     BYT,
     CHR,
     STR,
@@ -722,8 +721,12 @@ class Using:
 
 class TypeOf:
     def __init__(self, type):
-        self.type
+        self.value = type.value
+        self.type = type.type
         
+        self.start = type.start
+        self.end = type.end
+
     def getType(self):
         return TYPEOF
 
@@ -1121,6 +1124,21 @@ class Bool:
 
 
 class Type:
+    def __init__(self, type, value):
+        self.type = type
+        self.value = value
+
+        self.start = self.value.start
+        self.end = self.value.end
+
+    def __repr__(self):
+        return f'\n\tType Node: \n\t\tType > {self.type} : Value > {self.value}'
+
+    def getType(self):
+        return self.type
+
+
+class Lst:
     def __init__(self, type, value):
         self.type = type
         self.value = value
@@ -3078,6 +3096,10 @@ class Parser:
         elif tok.type == TYP:
             res.registerAdvance()
             self.advance()
+            return res.success(Lst(tok.type, tok))
+        elif tok.type == LST:
+            res.registerAdvance()
+            self.advance()
             return res.success(Type(tok.type, tok))
         elif tok.type == TYPEOF:
             res.registerAdvance()
@@ -4090,7 +4112,14 @@ class compile2Csharp:
         return f'{op.value}{self.genOperationPart(node)}'
 
     def genBinOp(self, left, op, right):
-        return f'{self.genOperationPart(left)} {op.value if not op.value == ISEQUALTO else EQEQ} {self.genOperationPart(right)}'
+        opValue = op.value if not op.value == ISEQUALTO else EQEQ
+        
+        if op.value == TOCODE:
+            return f'({self.genOperationPart(right)} as {self.genOperationPart(left)})'    
+        return f'{self.genOperationPart(left)} {opValue} {self.genOperationPart(right)}'
+
+    def genTypeOf(self, type):
+        return f'{self.convertTypeof2String(type.value)}'
 
     def genReasign(self, name, op, value):
         if op.value == PLUSPLUS:
@@ -4198,6 +4227,8 @@ class compile2Csharp:
             res = self.genUnaryOp(part.op, part.node)
         elif isinstance(part, str):
             res = part
+        elif isinstance(part, TypeOf):
+            res = self.genTypeOf(part)
         else:
             res = part.value.value
 
@@ -4230,6 +4261,26 @@ class compile2Csharp:
             return type + '.' + type if not self.isAccessingClass(type) else type
         else:
             return type.value + '.' + type.value if not self.isAccessingClass(type.value) else type.value 
+
+    def convertTypeof2String(self, type):
+        if type == 'BYT':
+            return 'byte'
+        elif type == 'CHR':
+            return 'char'
+        elif type == 'STR':
+            return 'string'
+        elif type == 'INT':
+            return 'int'
+        elif type == 'FLT':
+            return 'float'
+        elif type == 'DBL':
+            return 'double'
+        elif type == 'BOL':
+            return 'bool'
+        elif type == 'TYP':
+            return 'Type'
+        elif type == 'LST':
+            return 'Array'
 
     def genBodyParts(self, part):
         if isinstance(part, DotAccess):
