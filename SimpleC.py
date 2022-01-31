@@ -4098,11 +4098,9 @@ class compile2Csharp:
         return f'{var.name}[{var.elementIdx.value}]'
 
     def genVarAccess(self, var):
-        print(self.currScript)
         value = var.varName.value
         for const in self.constants:
             if const.accessibility:
-                print(f'(lib: {const.script.lib}) '+ const.name + ' == ' + value)
                 if const.name == value:
                     return f'___Global___.{const.script.lib}_{value}'
             if not const.accessibility:
@@ -4720,5 +4718,6 @@ def run(projectdir):
 # - OverrideFunction
 # - Metacode
 # - Cannot have private classes
+# - Update Wiki on GitHub!
 #
 
