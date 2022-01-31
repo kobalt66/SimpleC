@@ -23,18 +23,20 @@ import random
 #############################
 
 # Variable types
-VAR = 'var'   # [variable]
-BYT = 'byt'   # [byte]
-CHR = 'chr'   # [character]
-STR = 'str'   # [string]
-INT = 'int'   # [integer]
-FLT = 'flt'   # [floating point]
-DBL = 'dbl'   # [double]
-BOL = 'bol'   # [boolean]
-TYP = 'typ'   # [type]
-LIST = 'list' # [array]
+OBJ = 'obj' # [object]
+VAR = 'var' # [variable]
+BYT = 'byt' # [byte]
+CHR = 'chr' # [character]
+STR = 'str' # [string]
+INT = 'int' # [integer]
+FLT = 'flt' # [floating point]
+DBL = 'dbl' # [double]
+BOL = 'bol' # [boolean]
+TYP = 'typ' # [type]
+LST = 'lst' # [array]
 
 VARTYPE = 'VARIABLE'
+TYPEOF = 'typeof'
 VARTYPES = [
     VAR,
     BYT,
@@ -45,8 +47,21 @@ VARTYPES = [
     DBL,
     BOL,
     TYP,
-    LIST
+    LST,
+    OBJ
 ]
+TYPEOFS = [
+    'BYT',
+    'CHR',
+    'STR',
+    'INT',
+    'FLT',
+    'DBL',
+    'BOL',
+    'TYP',
+    'LST'
+]
+
 
 # Keywords
 IF = 'if'
@@ -72,7 +87,6 @@ RETURN = 'return'
 CONTINUE = 'continue'
 BREAK = 'break'
 SIZEOF = 'sizeof'
-TYPEOF = 'typeof'
 LENGHTOF = 'lenghtof'
 NULL = 'null'
 FALSE = 'false'
@@ -105,7 +119,6 @@ KEYWORDS = [
     CONTINUE,
     BREAK,
     SIZEOF,
-    TYPEOF,
     LENGHTOF,
     USING,
     NAMESPACE
@@ -188,8 +201,9 @@ LETGITS = LETTERS + DIGITS
 FLOATMIN = 0.0000000000000001
 
 outputdir = ""
-projectdir = ""
+librarydir = "Libraries"
 fileType = ".sc"
+usedLibs = []
 
 # Extra types
 BON = 'binopnode'
@@ -200,7 +214,7 @@ LIA = 'listaccess'
 AGA = 'argaccess'
 FUNCTYPES = [
     VOID,
-    VAR,
+    OBJ,
     BYT,
     CHR,
     STR,
@@ -209,7 +223,7 @@ FUNCTYPES = [
     DBL,
     BOL,
     TYP,
-    LIST
+    LST
 ]
 
 
@@ -463,6 +477,7 @@ class Lexer:
 
         type = KEYWORD if value in KEYWORDS else IDENTIFIER
         type = VARTYPE if value in VARTYPES else type
+        type = TYPEOF if value in TYPEOFS else type
         type = BOL if value in (TRUE, FALSE) else type
         return Token(type, value, start, self.pos)
 
@@ -704,6 +719,18 @@ class Using:
 
     def __repr__(self):
         return f'\n\tUsing Node : \n\t\tNamespace > {self.name}'
+
+
+class TypeOf:
+    def __init__(self, type):
+        self.value = type.value
+        self.type = type.type
+        
+        self.start = type.start
+        self.end = type.end
+
+    def getType(self):
+        return TYPEOF
 
 
 class Variable:
@@ -1113,6 +1140,21 @@ class Type:
         return self.type
 
 
+class Lst:
+    def __init__(self, type, value):
+        self.type = type
+        self.value = value
+
+        self.start = self.value.start
+        self.end = self.value.end
+
+    def __repr__(self):
+        return f'\n\tType Node: \n\t\tType > {self.type} : Value > {self.value}'
+
+    def getType(self):
+        return self.type
+
+
 class Var:
     def __init__(self, type, value):
         self.type = type
@@ -1260,6 +1302,8 @@ class Parser:
                     lib = metaNode.value
                 elif metaNode.type == IMPORT:
                     imports.append(metaNode)
+                    if not metaNode.value in usedLibs:
+                        usedLibs.append(metaNode.value)
                 else:
                     metacode.append(metaNode)
             elif self.currTok.type == KEYWORD:
@@ -2862,7 +2906,7 @@ class Parser:
         res.registerAdvance()
         self.advance()
 
-        if type == LIST:
+        if type == LST:
             if not self.currTok.type == LSBRACKET:
                 return res.failure(
                     Error(
@@ -2943,7 +2987,7 @@ class Parser:
     def listElements(self):
         res = ParseResult()
 
-        listType = LIST
+        listType = LST
         if self.currTok.type == VARTYPE:
             listType = self.currTok.value
             res.registerAdvance()
@@ -3054,7 +3098,15 @@ class Parser:
         elif tok.type == TYP:
             res.registerAdvance()
             self.advance()
+            return res.success(Lst(tok.type, tok))
+        elif tok.type == LST:
+            res.registerAdvance()
+            self.advance()
             return res.success(Type(tok.type, tok))
+        elif tok.type == TYPEOF:
+            res.registerAdvance()
+            self.advance()
+            return res.success(TypeOf(tok))
         elif tok.type == IDENTIFIER or tok.value in PREDEFINED:
             res.registerAdvance()
             self.advance()
@@ -3177,7 +3229,7 @@ class Parser:
             return res.success(UnaryNode(op_tok, node))
 
         node = res.register(self.bin_op(
-            self.arith_expr, (EQUALS, ISEQUALTO, NOT, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
+            self.arith_expr, (EQUALS, ISEQUALTO, NOT, TOCODE, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
         if res.error:
             return res
 
@@ -3263,21 +3315,18 @@ class Parser:
         return res.success(left)
 
 
-def getUsedScripts(root):
-    global projectdir, fileType
+def ParseScripts(projectdir):
     files = os.listdir(projectdir)
     print(files)
     
     for file in files:
         name, extension = os.path.splitext(file)
-        if not extension == fileType or name == root:
+        if not extension == fileType:
             continue
         
-        script, error = openFile(name + fileType)
+        script, error = openFile(projectdir, name)
         if error:
             return error
-        if not '#lib' in script:
-            continue
     
         lexer = Lexer(name, script)
         tokens, error = lexer.genTokens()
@@ -3292,6 +3341,33 @@ def getUsedScripts(root):
 
     return None
 
+def ParseExternLibraries():
+    files = os.listdir(librarydir)
+    
+    for file in files:
+        name, extension = os.path.splitext(file)
+        if not extension == fileType:
+            continue
+        
+        if not name in usedLibs:
+            continue
+        
+        script, error = openFile(librarydir, name)
+        if error:
+            return error
+    
+        lexer = Lexer(name, script)
+        tokens, error = lexer.genTokens()
+        if error:
+            return error
+
+        # Parsing
+        parser = Parser(name, tokens)
+        ast = parser.parse()
+        if ast.error:
+            return ast.error
+
+    return None
 
 ####################
 # - The compiler - #
@@ -4022,9 +4098,11 @@ class compile2Csharp:
         return f'{var.name}[{var.elementIdx.value}]'
 
     def genVarAccess(self, var):
+        print(self.currScript)
         value = var.varName.value
         for const in self.constants:
             if const.accessibility:
+                print(f'(lib: {const.script.lib}) '+ const.name + ' == ' + value)
                 if const.name == value:
                     return f'___Global___.{const.script.lib}_{value}'
             if not const.accessibility:
@@ -4038,7 +4116,14 @@ class compile2Csharp:
         return f'{op.value}{self.genOperationPart(node)}'
 
     def genBinOp(self, left, op, right):
-        return f'{self.genOperationPart(left)} {op.value if not op.value == ISEQUALTO else EQEQ} {self.genOperationPart(right)}'
+        opValue = op.value if not op.value == ISEQUALTO else EQEQ
+        
+        if op.value == TOCODE:
+            return f'({self.genOperationPart(right)} as {self.genOperationPart(left)})'    
+        return f'{self.genOperationPart(left)} {opValue} {self.genOperationPart(right)}'
+
+    def genTypeOf(self, type):
+        return f'{self.convertTypeof2String(type.value)}'
 
     def genReasign(self, name, op, value):
         if op.value == PLUSPLUS:
@@ -4146,6 +4231,8 @@ class compile2Csharp:
             res = self.genUnaryOp(part.op, part.node)
         elif isinstance(part, str):
             res = part
+        elif isinstance(part, TypeOf):
+            res = self.genTypeOf(part)
         else:
             res = part.value.value
 
@@ -4169,13 +4256,37 @@ class compile2Csharp:
         elif type == TYP:
             return 'Type'
         elif type == VAR:
+            return 'var'
+        elif type == OBJ:
             return 'object'
+        elif type == LST:
+            return 'Array'
         elif type == VOID:
             return 'void'
         elif isinstance(type, str):
             return type + '.' + type if not self.isAccessingClass(type) else type
         else:
             return type.value + '.' + type.value if not self.isAccessingClass(type.value) else type.value 
+
+    def convertTypeof2String(self, type):
+        if type == 'BYT':
+            return 'byte'
+        elif type == 'CHR':
+            return 'char'
+        elif type == 'STR':
+            return 'string'
+        elif type == 'INT':
+            return 'int'
+        elif type == 'FLT':
+            return 'float'
+        elif type == 'DBL':
+            return 'double'
+        elif type == 'BOL':
+            return 'bool'
+        elif type == 'TYP':
+            return 'Type'
+        elif type == 'LST':
+            return 'Array'
 
     def genBodyParts(self, part):
         if isinstance(part, DotAccess):
@@ -4237,6 +4348,12 @@ class compile2Csharp:
             self.write('\n')
         self.write('\n' + '/' * 200)
 
+        # Load all global variables
+        for lib in self.ms.libs:
+            for script in lib.scripts:
+                for var in script.global_variables:
+                    self.genGlobalVar(script, var)
+        
         # Start with libs
         for lib in self.ms.libs:
             self.write('\n\n')
@@ -4245,7 +4362,6 @@ class compile2Csharp:
 
             # Generate all script classes
             for script in lib.scripts:
-                self.currScript = script.name
                 error = self.genScript(script)
                 if error:
                     return error
@@ -4263,6 +4379,7 @@ class compile2Csharp:
         return None
 
     def genScript(self, script):
+        self.currScript = script.name
         self.write(f'namespace {script.name}' + '\n{\n')
 
         # Give necessary information to the compiler
@@ -4281,10 +4398,6 @@ class compile2Csharp:
         # imports
         for imp in script.imports:
             self.write(f'\nusing {imp.value};')
-
-        # global_variables
-        for var in script.global_variables:
-            self.genGlobalVar(script, var)
 
         # namespaces
         for namespace in script.namespaces:
@@ -4558,9 +4671,9 @@ class compile2Csharp:
 ####################
 
 
-def openFile(fn):
+def openFile(projectdir, fn):
     try:
-        with open(f'{projectdir}/{fn}', "r") as f:
+        with open(f'{projectdir}/{fn}{fileType}', "r") as f:
             script = f.read()
             f.close()
             return script, None
@@ -4568,37 +4681,25 @@ def openFile(fn):
         return None, Error(e, PYTHON_EXCEPTION, Position(0, -1, -1, fn, ""), fn)
 
 
-def run(fn, text):
+def run(projectdir):
     # Reset data
-    global masterscript, metacode, outputdir, projectdir
+    global masterscript, metacode, usedLibs, outputdir
     masterscript = MasterScript([])
+    usedLibs = []
 
-    # Lexing
-    lexer = Lexer(fn, text)
-    tokens, error = lexer.genTokens()
+    # Parsing the project
+    error = ParseScripts(projectdir)
+    if error:
+        return error
+    error = ParseExternLibraries()
     if error:
         return error
 
-    # Parsing
-    parser = Parser(fn, tokens)
-    ast = parser.parse()
-    if ast.error:
-        return ast.error
-
-    # Parsing rest of the Project
-    error = getUsedScripts(fn)
-    if error:
-        return error
-
-    # Compiling
-    #compiler = compile2python(masterscript, outputdir, projectdir)
+    # Compiling the project
     compiler = compile2Csharp(masterscript, outputdir, projectdir)
     error = compiler.compile()
     if error:
         return error
-
-    # That's something for compile2python:
-    # compiler.checkPaths()
 
     return None
 
@@ -4619,6 +4720,5 @@ def run(fn, text):
 # - OverrideFunction
 # - Metacode
 # - Cannot have private classes
-# - Import is kind of broken? Importing another lib will not give access to it.
 #
 
