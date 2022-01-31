@@ -23,6 +23,7 @@ import random
 #############################
 
 # Variable types
+OBJ = 'obj' # [object]
 VAR = 'var' # [variable]
 BYT = 'byt' # [byte]
 CHR = 'chr' # [character]
@@ -37,6 +38,7 @@ LST = 'lst' # [array]
 VARTYPE = 'VARIABLE'
 TYPEOF = 'typeof'
 VARTYPES = [
+    VAR,
     BYT,
     CHR,
     STR,
@@ -45,10 +47,10 @@ VARTYPES = [
     DBL,
     BOL,
     TYP,
-    LST
+    LST,
+    OBJ
 ]
 TYPEOFS = [
-    'VAR',
     'BYT',
     'CHR',
     'STR',
@@ -212,7 +214,7 @@ LIA = 'listaccess'
 AGA = 'argaccess'
 FUNCTYPES = [
     VOID,
-    VAR,
+    OBJ,
     BYT,
     CHR,
     STR,
@@ -4252,6 +4254,8 @@ class compile2Csharp:
         elif type == TYP:
             return 'Type'
         elif type == VAR:
+            return 'var'
+        elif type == OBJ:
             return 'object'
         elif type == LST:
             return 'Array'
