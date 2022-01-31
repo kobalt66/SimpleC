@@ -4098,9 +4098,11 @@ class compile2Csharp:
         return f'{var.name}[{var.elementIdx.value}]'
 
     def genVarAccess(self, var):
+        print(self.currScript)
         value = var.varName.value
         for const in self.constants:
             if const.accessibility:
+                print(f'(lib: {const.script.lib}) '+ const.name + ' == ' + value)
                 if const.name == value:
                     return f'___Global___.{const.script.lib}_{value}'
             if not const.accessibility:
@@ -4346,6 +4348,12 @@ class compile2Csharp:
             self.write('\n')
         self.write('\n' + '/' * 200)
 
+        # Load all global variables
+        for lib in self.ms.libs:
+            for script in lib.scripts:
+                for var in script.global_variables:
+                    self.genGlobalVar(script, var)
+        
         # Start with libs
         for lib in self.ms.libs:
             self.write('\n\n')
@@ -4354,7 +4362,6 @@ class compile2Csharp:
 
             # Generate all script classes
             for script in lib.scripts:
-                self.currScript = script.name
                 error = self.genScript(script)
                 if error:
                     return error
@@ -4372,6 +4379,7 @@ class compile2Csharp:
         return None
 
     def genScript(self, script):
+        self.currScript = script.name
         self.write(f'namespace {script.name}' + '\n{\n')
 
         # Give necessary information to the compiler
@@ -4390,10 +4398,6 @@ class compile2Csharp:
         # imports
         for imp in script.imports:
             self.write(f'\nusing {imp.value};')
-
-        # global_variables
-        for var in script.global_variables:
-            self.genGlobalVar(script, var)
 
         # namespaces
         for namespace in script.namespaces:
@@ -4716,6 +4720,5 @@ def run(projectdir):
 # - OverrideFunction
 # - Metacode
 # - Cannot have private classes
-# - Import is kind of broken? Importing another lib will not give access to it.
 #
 
