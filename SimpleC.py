@@ -12,9 +12,6 @@
 # I hope you enjoy my language :)                                                            #
 ##############################################################################################
 
-
-from ast import BinOp, UnaryOp
-from typing import Counter
 import string
 import os
 import numpy
@@ -26,15 +23,16 @@ import random
 #############################
 
 # Variable types
-VAR = 'var'  # [variable]
-BYT = 'byt'  # [byte]
-CHR = 'chr'  # [character]
-STR = 'str'  # [string]
-INT = 'int'  # [integer]
-FLT = 'flt'  # [floating point]
-DBL = 'dbl'  # [double]
-BOL = 'bol'  # [boolean]
-TYP = 'typ'  # [type]
+VAR = 'var'   # [variable]
+BYT = 'byt'   # [byte]
+CHR = 'chr'   # [character]
+STR = 'str'   # [string]
+INT = 'int'   # [integer]
+FLT = 'flt'   # [floating point]
+DBL = 'dbl'   # [double]
+BOL = 'bol'   # [boolean]
+TYP = 'typ'   # [type]
+LIST = 'list' # [array]
 
 VARTYPE = 'VARIABLE'
 VARTYPES = [
@@ -46,7 +44,8 @@ VARTYPES = [
     FLT,
     DBL,
     BOL,
-    TYP
+    TYP,
+    LIST
 ]
 
 # Keywords
@@ -190,6 +189,7 @@ FLOATMIN = 0.0000000000000001
 
 outputdir = ""
 projectdir = ""
+fileType = ".sc"
 
 # Extra types
 BON = 'binopnode'
@@ -208,7 +208,8 @@ FUNCTYPES = [
     FLT,
     DBL,
     BOL,
-    TYP
+    TYP,
+    LIST
 ]
 
 
@@ -832,9 +833,10 @@ class List:
 
 
 class ListSpace:
-    def __init__(self, length, elements):
+    def __init__(self, length, elements, listType):
         self.length = length
         self.elements = elements
+        self.listType = listType
 
     def __repr__(self):
         return f'\n\tListSpace Node: \n\t\tLength > {self.length}\n\t\tElements > {self.elements}'
@@ -1189,9 +1191,13 @@ metacode = None
 
 class Parser:
     def __init__(self, scriptName, tokens):
+        global metacode
+        metacode = []
+        
         self.tokens = tokens
         self.scriptName = scriptName
         self.idx = -1
+        
         self.advance()
 
     def reverse(self, amount=1):
@@ -1472,8 +1478,9 @@ class Parser:
         const = False
         protected = False
 
-        res.registerAdvance()
-        self.advance()
+        if self.currTok.value in (PUBLIC, PRIVATE):
+            res.registerAdvance()
+            self.advance()
 
         while self.currTok.value in (STATIC, CONST, PROTECTED):
             if self.currTok.value == STATIC:
@@ -1743,7 +1750,8 @@ class Parser:
                 self.advance()
                 break
             if not self.currTok.type == VARTYPE:
-                return res.failure(
+                if not self.currTok.type == IDENTIFIER:
+                    return res.failure(
                     Error(
                         "Expected variable type.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
@@ -1862,7 +1870,7 @@ class Parser:
                             "'public', 'static' and 'const' are not allowed in a function.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
                 else:
-                    variables.append(statement)
+                    body.append(statement)
             elif isinstance(statement, Class) or isinstance(statement, Struct) or isinstance(statement, Function):
                 return res.failure(
                     Error(
@@ -1924,7 +1932,8 @@ class Parser:
                 self.advance()
                 break
             if not self.currTok.type == VARTYPE:
-                return res.failure(
+                if not self.currTok.type == IDENTIFIER:
+                    return res.failure(
                     Error(
                         "Expected variable type.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
@@ -1988,7 +1997,7 @@ class Parser:
                             "'public', 'static' and 'const' are not allowed in a function.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
                 else:
-                    variables.append(statement)
+                    body.append(statement)
             elif isinstance(statement, Class) or isinstance(statement, Struct) or isinstance(statement, Function):
                 return res.failure(
                     Error(
@@ -2757,12 +2766,11 @@ class Parser:
             res.registerAdvance()
             self.advance()
 
-            if not self.currTok.type == INT:
-                if not self.currTok.type == IDENTIFIER:
-                    return res.failure(
-                        Error(
-                            "Expected integer or identifier.", SYNTAXERROR,
-                            self.currTok.start, self.scriptName))
+            if not self.currTok.type in (INT, IDENTIFIER):
+                return res.failure(
+                    Error(
+                        "Expected integer or identifier.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
 
             idx = self.currTok
             res.registerAdvance()
@@ -2819,7 +2827,7 @@ class Parser:
                             "Expected ';'.", SYNTAXERROR,
                             self.currTok.start, self.scriptName))
 
-                return res.success(ReasignVar(left, EQUALS, value))
+                return res.success(ReasignVar(left, Token(EQUALS, EQUALS), value))
             else:
                 self.reverse()
 
@@ -2854,7 +2862,13 @@ class Parser:
         res.registerAdvance()
         self.advance()
 
-        if self.currTok.type == LSBRACKET:
+        if type == LIST:
+            if not self.currTok.type == LSBRACKET:
+                return res.failure(
+                    Error(
+                        "Expected '['.", SYNTAXERROR,
+                        self.currTok.start, self.scriptName))
+                
             res.registerAdvance()
             self.advance()
 
@@ -2889,8 +2903,8 @@ class Parser:
             value = res.register(self.listElements())
             if res.error:
                 return res
-
-            return res.success(List(None, None, None, False, False, False, type, name, value, self.currTok.start, self.currTok.end))
+                        
+            return res.success(List(None, None, None, False, False, False, value.listType, name, value, self.currTok.start, self.currTok.end))
 
         if not self.currTok.type == IDENTIFIER:
             return res.failure(
@@ -2917,7 +2931,7 @@ class Parser:
         value = res.register(self.expr())
         if res.error:
             return res
-
+        
         if not self.currTok.type == ENDCOLUMN:
             return res.failure(
                 Error(
@@ -2929,7 +2943,9 @@ class Parser:
     def listElements(self):
         res = ParseResult()
 
+        listType = LIST
         if self.currTok.type == VARTYPE:
+            listType = self.currTok.value
             res.registerAdvance()
             self.advance()
 
@@ -2967,7 +2983,7 @@ class Parser:
                         "Expected ';'.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
 
-            return res.success(ListSpace(length, None))
+            return res.success(ListSpace(length, None, listType))
 
         if not self.currTok.type == LCBRACKET:
             return res.failure(
@@ -2995,19 +3011,21 @@ class Parser:
                 return res
 
             elements.append(element)
-
+            listType = element.type.value if isinstance(element, Variable) else listType
+            listType = element.name if isinstance(element, ArgAccess) else listType
+            
             if self.currTok.type == COMMA:
                 continue
 
             if not self.currTok.type == RCBRACKET:
-                return res.failure(
+                return None, res.failure(
                     Error(
                         "Expected '}'.", SYNTAXERROR,
                         self.currTok.start, self.scriptName))
             else:
                 break
 
-        return res.success(ListSpace(len(elements), elements))
+        return res.success(ListSpace(len(elements), elements, listType))
 
     def atom(self):
         res = ParseResult()
@@ -3243,6 +3261,36 @@ class Parser:
             left = BinOpNode(left, op_tok, right)
 
         return res.success(left)
+
+
+def getUsedScripts(root):
+    global projectdir, fileType
+    files = os.listdir(projectdir)
+    print(files)
+    
+    for file in files:
+        name, extension = os.path.splitext(file)
+        if not extension == fileType or name == root:
+            continue
+        
+        script, error = openFile(name + fileType)
+        if error:
+            return error
+        if not '#lib' in script:
+            continue
+    
+        lexer = Lexer(name, script)
+        tokens, error = lexer.genTokens()
+        if error:
+            return error
+
+        # Parsing
+        parser = Parser(name, tokens)
+        ast = parser.parse()
+        if ast.error:
+            return ast.error
+
+    return None
 
 
 ####################
@@ -3792,6 +3840,15 @@ class compile2python:
                         f'\n{tab * tabs}self.{var.name}.equals({var.value.value.value})')
         return None
 
+################################################################################################################################################################################
+
+class constant:
+    def __init__(self, script, accessibility, name, type, value):
+        self.script = script
+        self.accessibility = accessibility
+        self.name = name
+        self.type = type
+        self.value = value
 
 class compile2Csharp:
     def __init__(self, masterscript, outputdir, projectdir):
@@ -3805,16 +3862,16 @@ class compile2Csharp:
         self.outputFile = f'{self.outputdir}output.cs'
 
         # keeping track of names
+        self.currScript = ''
+        self.usings = []
         self.classes = []
         self.structs = []
+        self.constants = []
 
         self.basicData = [
             'using System;',
             'using System.Collections;',
             'using System.Collections.Generic;',
-            ' ',
-            'public const object lengthof = list => { return (list as Array).Length; };',
-            'public const object sqrt = value => { return Math.Sqrt(value); };'
         ]
 
         # Setup output.py
@@ -3837,14 +3894,22 @@ class compile2Csharp:
             print(f.read())
             f.close()
 
+    def isAccessingClass(self, varName):
+        for using in self.usings:
+            if varName in using:
+                return True
+        return False
+    
     def genUsing(self, using):
         if isinstance(using.name, VarAccess):
+            self.usings.append(using.name.varName.value)
             self.write(
-                f'using {using.name.varName.value};')
+                f'\nusing {using.name.varName.value};')
         elif isinstance(using.name, DotAccess):
             dotAccess = self.genDotaccess(using.name)
+            self.usings.append(dotAccess)
             self.write(
-                f'using {dotAccess};')
+                f'\nusing {dotAccess};')
         else:
             return Error(f'You can only use a varaccess point inside a using expression.', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
@@ -3867,7 +3932,7 @@ class compile2Csharp:
         for arg in var.args:
             currIdx += 1
             if isinstance(arg, VarAccess):
-                value += f'{arg.varName.value}'
+                value += f'{self.genVarAccess(arg)}'
             elif isinstance(arg, DotAccess):
                 currAccess = arg
                 while isinstance(currAccess, DotAccess) and currAccess.parent.value:
@@ -3898,7 +3963,8 @@ class compile2Csharp:
 
     def genArgAccess(self, access):
         Var = access.name
-        value = Var if not Var in self.classes and not Var in self.structs else f'{Var}.{Var}'
+        value = 'new ' if Var in self.classes or Var in self.structs else ''
+        value = Var if not Var in self.classes and not Var in self.structs or self.isAccessingClass(Var) else f'new {Var}.{Var}'
         res = f'{value}('
 
         currIdx = 0
@@ -3909,9 +3975,11 @@ class compile2Csharp:
             elif isinstance(param, String):
                 res += self.genString(param)
             elif isinstance(param, VarAccess):
-                res += param.varName.value
+                res += self.genVarAccess(param)
             elif isinstance(param, DotAccess):
                 res += self.genDotaccess(param)
+            elif isinstance(param, BinOpNode):
+                res += self.genBinOp(param.left, param.op, param.right)
             else:
                 res += param.value.value
 
@@ -3952,6 +4020,19 @@ class compile2Csharp:
 
     def genListAccess(self, var):
         return f'{var.name}[{var.elementIdx.value}]'
+
+    def genVarAccess(self, var):
+        value = var.varName.value
+        for const in self.constants:
+            if const.accessibility:
+                if const.name == value:
+                    return f'___Global___.{const.script.lib}_{value}'
+            if not const.accessibility:
+                if const.name == value and const.script.name == self.currScript:
+                    return f'___Global___.{const.script.lib}_{const.script.name}_{value}'
+        
+        value = value if not value in self.classes and not value in self.structs or self.isAccessingClass(value) else f'{value}.{value}'
+        return value 
 
     def genUnaryOp(self, op, node):
         return f'{op.value}{self.genOperationPart(node)}'
@@ -4035,7 +4116,7 @@ class compile2Csharp:
             self.write('\nelse\n{\n')
 
             # body
-            for part in _elif.body:
+            for part in If.elseCase.body:
                 error = self.genBodyParts(part)
                 if error:
                     return error
@@ -4054,7 +4135,7 @@ class compile2Csharp:
         elif isinstance(part, ListAccess):
             res = self.genListAccess(part)
         elif isinstance(part, VarAccess):
-            res = part.varName.value
+            res = self.genVarAccess(part)
         elif isinstance(part, Number):
             res = self.genNumber(part)
         elif isinstance(part, String):
@@ -4087,8 +4168,14 @@ class compile2Csharp:
             return 'char'
         elif type == TYP:
             return 'Type'
-        else:
+        elif type == VAR:
             return 'object'
+        elif type == VOID:
+            return 'void'
+        elif isinstance(type, str):
+            return type + '.' + type if not self.isAccessingClass(type) else type
+        else:
+            return type.value + '.' + type.value if not self.isAccessingClass(type.value) else type.value 
 
     def genBodyParts(self, part):
         if isinstance(part, DotAccess):
@@ -4104,11 +4191,14 @@ class compile2Csharp:
             if isinstance(part.name, str):
                 self.write(
                     f'\n{self.genReasign(part.name, part.op, part.value)};')
+            elif isinstance(part.name, ListAccess):
+                 self.write(
+                    f'\n{self.genReasign(self.genOperationPart(part.name), part.op, part.value)};')
             else:
                 self.write(
                     f'\n{self.genReasign(part.name.varName, part.op, part.value)};')
             return None
-        elif isinstance(part, Variable):
+        elif isinstance(part, Variable) or isinstance(part, List):
             self.genVariable(part, True)
             return None
         elif isinstance(part, Function):
@@ -4155,11 +4245,20 @@ class compile2Csharp:
 
             # Generate all script classes
             for script in lib.scripts:
+                self.currScript = script.name
                 error = self.genScript(script)
                 if error:
                     return error
             self.write('\n}\n')
 
+        # Generating the global class
+        self.write(f'\npublic static class ___Global___' + '\n{\n')
+        for const in self.constants:
+            tokens = const.script.lib
+            tokens += '_' + const.script.name if not const.accessibility else ''
+            self.write(f'\npublic static {const.type} {tokens}_{const.name} = {const.value};')
+        self.write('\n}')
+        
         print('Successfully compiled the project!')
         return None
 
@@ -4169,13 +4268,13 @@ class compile2Csharp:
         # Give necessary information to the compiler
         for _class in script.global_classes:
             if (_class.name.value in self.classes):
-                return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
+                return Error(f'({self.currScript}) You\'re not allowed to define two classes with the same name [{_class.name.value}].', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
             self.classes.append(_class.name.value)
             
         for struct in script.global_structs:
             if (struct.name.value in self.structs):
-                return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
+                return Error(f'({self.currScript}) You\'re not allowed to define two structs with the same name [{struct.name.value}].', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
             self.structs.append(struct.name.value)
 
@@ -4185,9 +4284,7 @@ class compile2Csharp:
 
         # global_variables
         for var in script.global_variables:
-            error = self.genVariable(var)
-            if error:
-                return error
+            self.genGlobalVar(script, var)
 
         # namespaces
         for namespace in script.namespaces:
@@ -4216,13 +4313,13 @@ class compile2Csharp:
         # Give necessary information to the compiler
         for _class in namespace.classes:
             if (_class.name.value in self.classes):
-                return Error(f'You\'re not allowed to define two classes with the same name.', COMP2CSHARPERROR,
+                return Error(f'({self.currScript}) You\'re not allowed to define two classes with the same name [{_class.name.value}].', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
             self.classes.append(_class.name.value)
             
         for struct in namespace.structs:
             if (struct.name.value in self.structs):
-                return Error(f'You\'re not allowed to define two structs with the same name.', COMP2CSHARPERROR,
+                return Error(f'({self.currScript}) You\'re not allowed to define two structs with the same name [{struct.name.value}].', COMP2CSHARPERROR,
                          Position(-1, -1, -1, '', ''), '<comiler>')
             self.structs.append(struct.name.value)
 
@@ -4255,6 +4352,7 @@ class compile2Csharp:
         self.write(f'\nnamespace {_class.name.value}' + '\n{\n')
 
         # using
+        self.usings = []
         for using in _class.externNameSpaces:
             error = self.genUsing(using)
             if error:
@@ -4295,7 +4393,7 @@ class compile2Csharp:
                 return error
         self.write('\n')
 
-        self.write(f'\nstruct {struct.name.value}' + '\n{\n')
+        self.write(f'\npublic struct {struct.name.value}' + '\n{\n')
 
         # variables
         for var in struct.variables:
@@ -4327,12 +4425,6 @@ class compile2Csharp:
                 self.write(', ')
         self.write(')\n{\n')
 
-        # variables
-        for var in constructor.variables:
-            error = self.genVariable(var, True)
-            if error:
-                return error
-
         # body
         for part in constructor.body:
             error = self.genBodyParts(part)
@@ -4346,25 +4438,22 @@ class compile2Csharp:
         attributes = ''
         attributes += 'public ' if func.public else 'private '
         attributes += 'static ' if func.static else ''
-        attributes += 'protected ' if func.protected else ''
-        self.write(f'\n{attributes}{func.returnType.value} {func.name.value}(')
+        #attributes += 'protected ' if func.protected else ''
+        self.write(f'\n{attributes}{self.convertType2String(func.returnType.value)} {func.name.value}(')
 
-        currIdx = 0
-        maxIdx = len(func.args)
-        for arg in func.args:
-            type = self.convertType2String(arg.type.value)
-            self.write(f'{type} {arg.name.value}')
+        if func.name.value == 'Main':
+            self.write('string[] args)\n{\n')
+        else:
+            currIdx = 0
+            maxIdx = len(func.args)
+            for arg in func.args:
+                type = self.convertType2String(arg.type.value)
+                self.write(f'{type} {arg.name.value}')
 
-            currIdx += 1
-            if currIdx < maxIdx:
-                self.write(', ')
-        self.write(')\n{\n')
-
-        # variables
-        for var in func.variables:
-            error = self.genVariable(var, True)
-            if error:
-                return error
+                currIdx += 1
+                if currIdx < maxIdx:
+                    self.write(', ')
+            self.write(')\n{\n')
 
         # body
         for part in func.body:
@@ -4374,6 +4463,18 @@ class compile2Csharp:
 
         self.write('\n}')
         return None
+
+    def getVarType(self, var):
+        return self.convertType2String(var.value.type)
+    
+    def getVarValue(self, var):
+        value = var.value.value.value
+        if var.value.type == FLT:
+            return str(value) + 'f'
+        elif isinstance(value, str):
+            return f'"{value}"' if len(value) > 1 else f"'{value}'"
+        else:
+            return var.value.value.value
 
     def genVariable(self, var, inBody=False, _return=False):
         # Setup variable
@@ -4412,14 +4513,15 @@ class compile2Csharp:
         if isinstance(var.value, AccessPoint):
             if isinstance(var.value, ArgAccess):
                 Var = var.value.name
-                res = Var if not Var in self.classes and not Var in self.structs else f'{Var}.{Var}'
+                res = 'new ' if Var in self.classes or Var in self.structs else ''
+                res += Var if not Var in self.classes and not Var in self.structs or self.isAccessingClass(Var) else f'{Var}.{Var}'
                 variable += f' = {res}({self.genArgs(var.value)});';
             elif isinstance(var.value, DotAccess):
                 variable += f' = {self.genDotaccess(var.value)};'
             elif isinstance(var.value, ListAccess):
                 variable += f' = {self.genListAccess(var.value)};'
             elif isinstance(var.value, VarAccess):
-                variable += f' = {var.value.varName.value};'
+                variable += f' = {self.genVarAccess(var.value)};'
         else:
             if var.value:
                 if isinstance(var.value, String):
@@ -4444,16 +4546,32 @@ class compile2Csharp:
             
         return None
 
+    def genGlobalVar(self, script, var):
+        name = var.name
+        type = self.getVarType(var)
+        value = self.getVarValue(var)
+        
+        self.constants.append(constant(script, var.public, name, type, value))
+        
 ####################
 # - Run Function - #
 ####################
+
+
+def openFile(fn):
+    try:
+        with open(f'{projectdir}/{fn}', "r") as f:
+            script = f.read()
+            f.close()
+            return script, None
+    except Exception as e:
+        return None, Error(e, PYTHON_EXCEPTION, Position(0, -1, -1, fn, ""), fn)
 
 
 def run(fn, text):
     # Reset data
     global masterscript, metacode, outputdir, projectdir
     masterscript = MasterScript([])
-    metacode = []
 
     # Lexing
     lexer = Lexer(fn, text)
@@ -4466,6 +4584,11 @@ def run(fn, text):
     ast = parser.parse()
     if ast.error:
         return ast.error
+
+    # Parsing rest of the Project
+    error = getUsedScripts(fn)
+    if error:
+        return error
 
     # Compiling
     #compiler = compile2python(masterscript, outputdir, projectdir)
@@ -4495,5 +4618,7 @@ def run(fn, text):
 #
 # - OverrideFunction
 # - Metacode
+# - Cannot have private classes
+# - Import is kind of broken? Importing another lib will not give access to it.
 #
 
