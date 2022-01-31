@@ -12,7 +12,6 @@
 # I hope you enjoy my language :)                                                            #
 ##############################################################################################
 
-from re import L
 import string
 import os
 import numpy
@@ -49,7 +48,7 @@ VARTYPES = [
     TYP,
     LST
 ]
-TYPEOFs = [
+TYPEOFS = [
     'VAR',
     'BYT',
     'CHR',
@@ -477,6 +476,7 @@ class Lexer:
 
         type = KEYWORD if value in KEYWORDS else IDENTIFIER
         type = VARTYPE if value in VARTYPES else type
+        type = TYPEOF if value in TYPEOFS else type
         type = BOL if value in (TRUE, FALSE) else type
         return Token(type, value, start, self.pos)
 
@@ -3205,7 +3205,7 @@ class Parser:
             return res.success(UnaryNode(op_tok, node))
 
         node = res.register(self.bin_op(
-            self.arith_expr, (EQUALS, ISEQUALTO, NOT, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
+            self.arith_expr, (EQUALS, ISEQUALTO, NOT, TOCODE, LESS, GREATER, LESSEQUAL, GREATEREQUAL)))
         if res.error:
             return res
 
